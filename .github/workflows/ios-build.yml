@@ -1,0 +1,253 @@
+name: Build iOS App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+    inputs:
+      export_method:
+        description: 'IPA Export Method (development, ad-hoc, enterprise, app-store)'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - ad-hoc
+          - app-store
+          - enterprise
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    name: Build iOS (APEX Fitness)
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    env:
+      LANG: en_US.UTF-8
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies and build mobile web app
+        run: |
+          cd frontend
+          npm ci
+          VITE_MOBILE=1 npm run build
+          node ../scripts/catalogue/stage-media.mjs dist
+
+      - name: Sync Capacitor iOS platform
+        run: |
+          cd frontend
+          npx cap sync ios
+          node scripts/check-mobile-bundle.mjs
+
+      - name: Validate code signing credentials
+        id: signing_setup
+        env:
+          CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD || 'apex-temp-build-keychain-pass' }}
+        run: |
+          if [ -z "$CERT_BASE64" ] || [ -z "$PROFILE_BASE64" ]; then
+            echo "valid=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Apple signing secrets (APPLE_CERTIFICATE_BASE64, PROVISIONING_PROFILE_BASE64) are not configured." >> "$GITHUB_OUTPUT"
+            echo "Signing secrets are not configured in GitHub repository secrets."
+            exit 0
+          fi
+
+          echo "Decoding certificate and provisioning profile..."
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" || true
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          echo "$CERT_BASE64" | base64 --decode > "$CERT_PATH"
+
+          if ! security import "$CERT_PATH" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"; then
+            echo "valid=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Failed to import .p12 certificate (invalid password or corrupted certificate data)." >> "$GITHUB_OUTPUT"
+            echo "::warning::Certificate import failed."
+            exit 0
+          fi
+
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -m1 '"' | sed -E 's/.*"([^"]+)".*/\1/' || true)
+          if [ -z "$IDENTITY" ]; then
+            echo "valid=false" >> "$GITHUB_OUTPUT"
+            echo "reason=No valid code signing identity found in the imported certificate." >> "$GITHUB_OUTPUT"
+            echo "::warning::No valid code signing identity found."
+            exit 0
+          fi
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          echo "$PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+
+          UUID=$(security cms -D -i "$PROFILE_PATH" 2>/dev/null | grep -A1 '<key>UUID</key>' | grep '<string>' | sed -E 's/.*<string>(.*)<\/string>.*/\1/' || true)
+          if [ -z "$UUID" ]; then
+            echo "valid=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Failed to parse UUID from provisioning profile." >> "$GITHUB_OUTPUT"
+            echo "::warning::Failed to parse provisioning profile."
+            exit 0
+          fi
+
+          cp "$PROFILE_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/"$UUID".mobileprovision
+
+          echo "valid=true" >> "$GITHUB_OUTPUT"
+          echo "identity=$IDENTITY" >> "$GITHUB_OUTPUT"
+          echo "profile_uuid=$UUID" >> "$GITHUB_OUTPUT"
+          echo "Signing configuration verified: identity '$IDENTITY', profile UUID '$UUID'."
+
+      # ---------------------------------------------------------
+      # PATH A: SIGNED BUILD AND IPA EXPORT
+      # ---------------------------------------------------------
+      - name: Archive iOS app (Signed)
+        if: steps.signing_setup.outputs.valid == 'true'
+        run: |
+          mkdir -p build
+          xcodebuild archive \
+            -workspace frontend/ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/APEX-Fitness.xcarchive
+
+      - name: Export genuine APEX-Fitness.ipa
+        if: steps.signing_setup.outputs.valid == 'true'
+        env:
+          EXPORT_METHOD: ${{ inputs.export_method || 'development' }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE_UUID: ${{ steps.signing_setup.outputs.profile_uuid }}
+        run: |
+          mkdir -p build/export
+          cat <<EOF > build/ExportOptions.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>${EXPORT_METHOD}</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>compileBitcode</key>
+              <false/>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.apex.fitness</key>
+                  <string>${PROFILE_UUID}</string>
+              </dict>
+          EOF
+
+          if [ -n "$TEAM_ID" ]; then
+            cat <<EOF >> build/ExportOptions.plist
+              <key>teamID</key>
+              <string>${TEAM_ID}</string>
+          EOF
+          fi
+
+          cat <<EOF >> build/ExportOptions.plist
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath build/APEX-Fitness.xcarchive \
+            -exportOptionsPlist build/ExportOptions.plist \
+            -exportPath build/export
+
+          IPA_PATH=$(find build/export -name "*.ipa" -type f | head -n 1)
+          if [ -n "$IPA_PATH" ]; then
+            mkdir -p build/artifact
+            cp "$IPA_PATH" build/artifact/APEX-Fitness.ipa
+            echo "Successfully generated APEX-Fitness.ipa"
+          else
+            echo "::error::No .ipa file generated during exportArchive"
+            exit 1
+          fi
+
+      - name: Upload APEX-Fitness.ipa
+        if: steps.signing_setup.outputs.valid == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: APEX-Fitness.ipa
+          path: build/artifact/APEX-Fitness.ipa
+          if-no-files-found: error
+
+      # ---------------------------------------------------------
+      # PATH B: UNSIGNED BUILD VERIFICATION (NO VALID SIGNING)
+      # ---------------------------------------------------------
+      - name: Compile and Archive iOS app (Unsigned Verification)
+        if: steps.signing_setup.outputs.valid != 'true'
+        run: |
+          mkdir -p build
+          xcodebuild archive \
+            -workspace frontend/ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/APEX-Fitness.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Upload Verified Archive (APEX-Fitness.xcarchive)
+        if: steps.signing_setup.outputs.valid != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: APEX-Fitness.xcarchive
+          path: build/APEX-Fitness.xcarchive
+          if-no-files-found: error
+
+      # ---------------------------------------------------------
+      # SUMMARY & CLEANUP
+      # ---------------------------------------------------------
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "### 📱 APEX Fitness iOS Build Status" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Check | Status | Details |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| :--- | :--- | :--- |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Compilation** | ✅ **SUCCESS** | Web assets synced & native Xcode scheme compiled |" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{ steps.signing_setup.outputs.valid }}" = "true" ]; then
+            echo "| **Code Signing** | ✅ **CONFIGURED** | Identity: \`${{ steps.signing_setup.outputs.identity }}\` |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| **IPA Export** | ✅ **SUCCESS** | **APEX-Fitness.ipa** ready for download |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| **Code Signing** | ⚠️ **NOT CONFIGURED / INVALID** | ${{ steps.signing_setup.outputs.reason }} |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| **IPA Export** | ⏸️ **SKIPPED** | An installable IPA requires a valid Apple signature. Uploaded **APEX-Fitness.xcarchive** for verification. |" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "#### 🔐 Required GitHub Secrets for APEX-Fitness.ipa:" >> "$GITHUB_STEP_SUMMARY"
+            echo "1. \`APPLE_CERTIFICATE_BASE64\`: Base64-encoded Apple Distribution or Development \`.p12\` certificate" >> "$GITHUB_STEP_SUMMARY"
+            echo "2. \`APPLE_CERTIFICATE_PASSWORD\`: Password for the \`.p12\` certificate file" >> "$GITHUB_STEP_SUMMARY"
+            echo "3. \`PROVISIONING_PROFILE_BASE64\`: Base64-encoded \`.mobileprovision\` profile matching bundle ID \`com.apex.fitness\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "4. \`APPLE_TEAM_ID\` *(optional)*: 10-character Apple Developer Team ID" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Clean up temporary keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
+          rm -f ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null || true

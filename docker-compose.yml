@@ -1,4 +1,4 @@
-name: apex
+name: apex-fitness
 
 services:
   # Passkey auth + per-user data (Node, no framework).
