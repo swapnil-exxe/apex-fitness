@@ -31,8 +31,8 @@ jobs:
       matrix:
         include:
           - image: api
-            context: ./api
-            file: ./api/Dockerfile
+            context: ./backend
+            file: ./backend/Dockerfile
           - image: web
             context: .
             file: ./web/Dockerfile

@@ -1,0 +1,52 @@
+# Render Blueprint Specification for APEX Fitness
+# Deploy full-stack APEX Fitness with one click on Render
+
+services:
+  # 1. Backend API Service
+  - type: web
+    name: apex-backend
+    runtime: docker
+    dockerfilePath: deploy/backend.Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false # Set to your Supabase PostgreSQL connection URL
+      - key: RP_ID
+        sync: false # e.g., your-app.onrender.com
+      - key: ORIGIN
+        sync: false # e.g., https://your-app.onrender.com
+      - key: RP_NAME
+        value: APEX Fitness
+      - key: FIRST_USER_ADMIN
+        value: "1"
+      - key: DATA_DIR
+        value: /data
+      - key: SECRET
+        generateValue: true
+    disk:
+      name: apex-data
+      mountPath: /data
+      sizeGB: 1
+
+  # 2. Frontend Web Service
+  - type: web
+    name: apex-frontend
+    runtime: docker
+    dockerfilePath: deploy/frontend.Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: NGINX_PORT
+        value: 80
+      - key: BACKEND
+        fromService:
+          type: web
+          name: apex-backend
+          property: host
+      - key: PORT
+        value: 3000

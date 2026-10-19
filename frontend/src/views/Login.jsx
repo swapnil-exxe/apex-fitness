@@ -11,6 +11,7 @@ import { Button, Segmented } from '../components/ui.jsx'
 import { askAddDeviceData } from '../sheets.jsx'
 import { passwordOn, PasswordRegisterForm, openPasswordSignIn } from '../components/PasswordAuth.jsx'
 import { openDeviceLinkRedeem } from '../components/Passkeys.jsx'
+import { GoogleSignInButton, initiateGoogleSignIn, handleAuthUrlHash } from '../components/GoogleAuth.jsx'
 
 function RegisterSheet({ close }) {
   const { setUser, pushState, pullState, loadConfig } = useStore()
@@ -62,6 +63,11 @@ function RegisterSheet({ close }) {
     </>}
     <div style={{ height: 12 }} />
     <Button variant="primary" onClick={go}>{t('Create passkey')}</Button>
+    {Boolean(config?.google_auth) && !inviteOnly && <>
+      <div style={{ height: 14 }} />
+      <div className="dim small" style={{ marginBottom: 10, textAlign: 'center' }}>{t('— or —')}</div>
+      <GoogleSignInButton onClick={() => { close(); initiateGoogleSignIn() }} label={t('Sign up with Google')} />
+    </>}
   </>
 }
 
@@ -70,6 +76,12 @@ export default function Login() {
   const config = useStore(s => s.config)
   const canGuest = guestAllowed(config)
   const pwOn = passwordOn(config)
+  const googleOn = Boolean(config?.google_auth)
+
+  useEffect(() => {
+    handleAuthUrlHash()
+  }, [])
+
   const register = () => useUI.getState().openSheet(close => <RegisterSheet close={close} />)
   const signIn = async () => {
     try { const u = await passkeyLogin(); setUser(u, { adopt: true }); await adoptProfile(askAddDeviceData); useUI.getState().toast(t('Welcome back, {0}', u.name)) }
@@ -100,6 +112,10 @@ export default function Login() {
     <div className="narrow" style={wrap}>
       {head}
       <div className="muted" style={{ marginBottom: 34 }}>{t('Your workouts. Your weights. Your profile.')}</div>
+      {googleOn && <>
+        <GoogleSignInButton onClick={() => initiateGoogleSignIn()} />
+        <div style={{ height: 10 }} />
+      </>}
       {webauthnOK() ? <>
         <Button variant="primary" icon="fingerprint" onClick={signIn}>{t('Sign in with passkey')}</Button>
         <div style={{ height: 10 }} />

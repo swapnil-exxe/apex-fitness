@@ -35,6 +35,11 @@ import { effectiveRoutineId } from './queue.js';
 import { stampPut } from './sync-stamps.js';
 import { atomicWrite as durableWrite } from './durable.js';
 import { excusedOn, nudgeFor, nudgeWindowOpen, toneOf } from './nudge.js';
+import { dbService, testConnection } from './db.js';
+import {
+  isGoogleAuthEnabled, getGoogleConfig, generateAuthUrl,
+  verifyStateCookie, verifyAuthCode, signLinkingChallenge, verifyLinkingChallenge
+} from './auth-google.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -146,6 +151,7 @@ db.creds = db.creds || [];
 db.subs = db.subs || [];
 db.invites = db.invites || [];
 db.deviceLinks = db.deviceLinks || [];   // unused one-time device links, hashed (device-link.js)
+db.federatedIdentities = db.federatedIdentities || [];
 const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(user.id));
 // 0600: db.json holds passkey credential material. It used to be covered by a blanket 0700 on
 // the whole directory; now that the directory stays traversable, the file carries its own mode.
@@ -158,6 +164,16 @@ function saveDb() {
   atomicWrite(dbFile, text, 0o600);
   try { atomicWrite(dbFile + '.bak', text, 0o600); }
   catch (e) { console.error('db.json.bak could not be written', e.message); }
+  if (process.env.DATABASE_URL) {
+    Promise.all([
+      ...db.users.map(u => dbService.upsertUser(u)),
+      ...db.creds.map(c => dbService.addPasskey(c)),
+      ...db.subs.map(s => dbService.saveSubscription(s)),
+      ...db.invites.map(i => dbService.saveInvite(i)),
+      ...db.deviceLinks.map(l => dbService.saveDeviceLink(l)),
+      ...(db.federatedIdentities || []).map(f => dbService.addFederatedIdentity(f))
+    ]).catch(e => console.error('[PostgreSQL] Async save error:', e.message));
+  }
 }
 // Flushed before and after the rename (durable.js): a host reset must not bring back the file
 // the client was told had been replaced.
@@ -166,6 +182,65 @@ function atomicWrite(file, content, mode) { durableWrite(file, content, mode); }
 // synced more writes ago than this merges on its next pull instead of taking the server's copy.
 const WID_KEEP = 50;
 const stateFile = uid => path.join(DATA, 'state-' + uid.replace(/[^a-zA-Z0-9_-]/g, '') + '.json');
+
+// Hydrate and synchronize with PostgreSQL / Supabase if DATABASE_URL is provided
+async function initDatabaseFromPostgres() {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    const conn = await testConnection();
+    if (!conn.ok) {
+      console.warn(`[PostgreSQL] Connection warning (${conn.error || conn.message}), falling back to local file storage.`);
+      return;
+    }
+    console.log('[PostgreSQL] Connected to persistent database.');
+
+    const pgUsers = await dbService.getAllUsers();
+    if (pgUsers && pgUsers.length > 0) {
+      db.users = pgUsers;
+      db.creds = await dbService.getAllPasskeys();
+      db.subs = await dbService.getAllSubscriptions();
+      db.invites = await dbService.getAllInvites();
+      db.deviceLinks = await dbService.getAllDeviceLinks();
+      db.federatedIdentities = await dbService.getAllFederatedIdentities();
+      console.log(`[PostgreSQL] Hydrated ${db.users.length} user(s), ${db.creds.length} passkey(s), ${db.federatedIdentities.length} federated identities from database.`);
+
+      // Hydrate state files if missing on local disk
+      for (const u of db.users) {
+        const file = stateFile(u.id);
+        if (!fs.existsSync(file)) {
+          const state = await dbService.getUserState(u.id);
+          if (state) {
+            atomicWrite(file, JSON.stringify(state));
+            console.log(`[PostgreSQL] Hydrated state for ${u.name} (${u.id})`);
+          }
+        }
+      }
+    } else if (db.users.length > 0) {
+      console.log(`[PostgreSQL] Empty database detected. Syncing ${db.users.length} user(s) from local storage...`);
+      for (const u of db.users) await dbService.upsertUser(u);
+      for (const c of db.creds) await dbService.addPasskey(c);
+      for (const s of db.subs) await dbService.saveSubscription(s);
+      for (const i of db.invites) await dbService.saveInvite(i);
+      for (const l of db.deviceLinks) await dbService.saveDeviceLink(l);
+      for (const f of (db.federatedIdentities || [])) await dbService.addFederatedIdentity(f);
+      for (const u of db.users) {
+        const file = stateFile(u.id);
+        if (fs.existsSync(file)) {
+          try {
+            const state = JSON.parse(fs.readFileSync(file, 'utf8'));
+            await dbService.saveUserState(u.id, state);
+          } catch (e) {
+            console.warn(`[PostgreSQL] State sync warning for ${u.id}:`, e.message);
+          }
+        }
+      }
+      console.log('[PostgreSQL] Initial local sync complete.');
+    }
+  } catch (err) {
+    console.error('[PostgreSQL] Initialization warning:', err.message);
+  }
+}
+
 // When a profile last fetched its document (GET /api/data). The document's own `_ts` moves only
 // on a push, so a device that only ever read — a second phone, a profile that trains elsewhere
 // and just looks — showed "last sync never" in the admin dashboard (QA 1.3.9). Kept on the user
@@ -651,7 +726,8 @@ const clearCookie = COOKIE === LEGACY_COOKIE
 const CSRF_EXEMPT = new Set([
   'POST /api/register/options', 'POST /api/register/verify',
   'POST /api/login/options', 'POST /api/login/verify',
-  'POST /api/pair/redeem'
+  'POST /api/pair/redeem',
+  'POST /api/auth/google/link'
 ]);
 const originsMatch = (a, b) => a.replace(/\/+$/, '') === b.replace(/\/+$/, '');
 function csrfOk(req, key) {
@@ -723,6 +799,10 @@ function json(res, code, obj, extraHeaders) {
   const body = JSON.stringify(obj);
   res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...(extraHeaders || {}) });
   res.end(body);
+}
+function redirect(res, url, extraHeaders) {
+  res.writeHead(302, { Location: url, 'Cache-Control': 'no-store', ...(extraHeaders || {}) });
+  res.end();
 }
 // A request the caller got wrong. The catch-all at the bottom answers it with this status and
 // message and does not log it: three of the routes below are reachable without a session, and a
@@ -1751,6 +1831,305 @@ const passkeyRoutes = {
   }
 };
 
+/* ---------- Google OAuth 2.0 / OIDC & Federated Identities ---------- */
+const googleAuthRoutes = {
+  'GET /api/auth/google/status': async (req, res) => {
+    json(res, 200, { enabled: isGoogleAuthEnabled() });
+  },
+
+  'GET /api/auth/google/url': async (req, res) => {
+    if (!isGoogleAuthEnabled()) {
+      return json(res, 400, { error: 'Google authentication is not configured', code: 'google-not-configured' });
+    }
+    const u = new URL(req.url, 'http://localhost');
+    const isMobile = u.searchParams.get('mobile') === 'true' || u.searchParams.get('mobile') === '1';
+    const returnTo = u.searchParams.get('returnTo') || '/';
+    const redirectMode = u.searchParams.get('redirect') === 'true' || u.searchParams.get('redirect') === '1';
+
+    const { url: authUrl, cookieValue } = generateAuthUrl({
+      origin: ORIGIN,
+      isMobile,
+      returnTo,
+      stateSecret: SECRET
+    });
+
+    const stateCookieName = SECURE ? '__Host-google_oauth_state' : 'google_oauth_state';
+    const stateCookie = `${stateCookieName}=${cookieValue}; Path=/; Max-Age=600; HttpOnly;${SECURE} SameSite=Lax`;
+
+    if (redirectMode) {
+      redirect(res, authUrl, { 'Set-Cookie': stateCookie });
+    } else {
+      json(res, 200, { url: authUrl }, { 'Set-Cookie': stateCookie });
+    }
+  },
+
+  'GET /api/auth/google/callback': async (req, res) => {
+    const u = new URL(req.url, 'http://localhost');
+    const code = u.searchParams.get('code');
+    const state = u.searchParams.get('state');
+    const oauthError = u.searchParams.get('error');
+
+    const cfg = getGoogleConfig(ORIGIN);
+    const frontendUrl = cfg.frontendUrl;
+    const stateCookieName = SECURE ? '__Host-google_oauth_state' : 'google_oauth_state';
+    const clearStateCookie = `${stateCookieName}=; Path=/; Max-Age=0; HttpOnly;${SECURE} SameSite=Lax`;
+
+    if (oauthError) {
+      audit(req, 'auth.google.fail', { ok: false, msg: oauthError });
+      return redirect(res, `${frontendUrl}/#auth-error=${encodeURIComponent(oauthError)}`, { 'Set-Cookie': clearStateCookie });
+    }
+
+    if (!code || !state) {
+      audit(req, 'auth.google.fail', { ok: false, msg: 'missing-code-or-state' });
+      return redirect(res, `${frontendUrl}/#auth-error=missing-params`, { 'Set-Cookie': clearStateCookie });
+    }
+
+    const stateCookieVal = cookieValues(req, stateCookieName)[0] || null;
+    const stateData = verifyStateCookie(stateCookieVal, SECRET);
+
+    if (!stateData || stateData.state !== state) {
+      audit(req, 'auth.google.fail', { ok: false, msg: 'invalid-state' });
+      return redirect(res, `${frontendUrl}/#auth-error=invalid-state`, { 'Set-Cookie': clearStateCookie });
+    }
+
+    let claims;
+    try {
+      claims = await verifyAuthCode({
+        code,
+        codeVerifier: stateData.codeVerifier,
+        origin: ORIGIN
+      });
+    } catch (err) {
+      audit(req, 'auth.google.fail', { ok: false, msg: 'verification-error', detail: err.message });
+      return redirect(res, `${frontendUrl}/#auth-error=token-verification-failed`, { 'Set-Cookie': clearStateCookie });
+    }
+
+    const isMobile = stateData.isMobile;
+
+    // 1. Existing Google Identity match
+    let fedId = (db.federatedIdentities || []).find(f => f.provider === 'google' && f.providerSubject === claims.sub);
+    if (!fedId && process.env.DATABASE_URL) {
+      try {
+        fedId = await dbService.getFederatedIdentity('google', claims.sub);
+        if (fedId && !db.federatedIdentities.some(f => f.id === fedId.id)) {
+          db.federatedIdentities.push(fedId);
+        }
+      } catch (e) {
+        console.warn('[PostgreSQL] Fed identity lookup warning:', e.message);
+      }
+    }
+
+    if (fedId) {
+      const user = db.users.find(u => u.id === fedId.userId);
+      if (!user || user.disabled) {
+        audit(req, 'auth.login.fail', { ok: false, uid: fedId.userId, msg: 'user-disabled' });
+        return redirect(res, `${frontendUrl}/#auth-error=account-disabled`, { 'Set-Cookie': clearStateCookie });
+      }
+
+      fedId.lastLogin = Date.now();
+      fedId.email = claims.email || fedId.email;
+      saveDb();
+      if (process.env.DATABASE_URL) {
+        await dbService.updateFederatedIdentityLastLogin('google', claims.sub).catch(e => console.error(e));
+      }
+
+      audit(req, 'auth.login.ok', { user, msg: 'google' });
+      if (isMobile) {
+        const token = makeSession(user);
+        return redirect(res, `com.apex.fitness://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(user)))}`, { 'Set-Cookie': clearStateCookie });
+      }
+      return redirect(res, `${frontendUrl}/#auth-success`, { 'Set-Cookie': [...sessionCookie(user), clearStateCookie] });
+    }
+
+    // 2. Account with matching email exists, but not linked yet
+    let existingUser = claims.email ? db.users.find(u => u.email && u.email.toLowerCase() === claims.email.toLowerCase()) : null;
+    if (!existingUser && claims.email && process.env.DATABASE_URL) {
+      try {
+        const pgUser = await dbService.getUserByEmail(claims.email);
+        if (pgUser) {
+          existingUser = db.users.find(u => u.id === pgUser.id);
+          if (!existingUser) {
+            existingUser = pgUser;
+            db.users.push(existingUser);
+          }
+        }
+      } catch (e) {
+        console.warn('[PostgreSQL] Email lookup warning:', e.message);
+      }
+    }
+
+    if (existingUser) {
+      // Security rule: NEVER automatically merge accounts without re-auth proof
+      const linkingToken = signLinkingChallenge({
+        userId: existingUser.id,
+        email: claims.email,
+        sub: claims.sub,
+        name: claims.name || existingUser.name
+      }, SECRET);
+
+      audit(req, 'auth.google.link-required', { user: existingUser, email: claims.email });
+      if (isMobile) {
+        return redirect(res, `com.apex.fitness://auth/link?token=${encodeURIComponent(linkingToken)}&email=${encodeURIComponent(claims.email)}&name=${encodeURIComponent(existingUser.name)}`, { 'Set-Cookie': clearStateCookie });
+      }
+      return redirect(res, `${frontendUrl}/#google-link&token=${encodeURIComponent(linkingToken)}&email=${encodeURIComponent(claims.email)}&name=${encodeURIComponent(existingUser.name)}`, { 'Set-Cookie': clearStateCookie });
+    }
+
+    // 3. New User Registration
+    if (INVITE_ONLY) {
+      audit(req, 'auth.register.fail', { ok: false, msg: 'invite-required', email: claims.email });
+      return redirect(res, `${frontendUrl}/#auth-error=invite-required`, { 'Set-Cookie': clearStateCookie });
+    }
+
+    const created = new Date().toISOString();
+    const newUser = {
+      id: crypto.randomBytes(12).toString('base64url'),
+      name: claims.name || claims.email.split('@')[0],
+      created,
+      email: claims.email
+    };
+    claimFirstAdmin(req, newUser);
+    db.users.push(newUser);
+
+    const newFedId = {
+      id: crypto.randomBytes(12).toString('base64url'),
+      userId: newUser.id,
+      provider: 'google',
+      providerSubject: claims.sub,
+      email: claims.email,
+      emailVerified: claims.emailVerified,
+      created: Date.now(),
+      lastLogin: Date.now()
+    };
+    db.federatedIdentities = db.federatedIdentities || [];
+    db.federatedIdentities.push(newFedId);
+    saveDb();
+
+    if (process.env.DATABASE_URL) {
+      try {
+        await dbService.upsertUser(newUser);
+        await dbService.addFederatedIdentity(newFedId);
+      } catch (e) {
+        console.error('[PostgreSQL] New user save error:', e.message);
+      }
+    }
+
+    audit(req, 'auth.register.ok', { user: newUser, msg: 'google' });
+    if (isMobile) {
+      const token = makeSession(newUser);
+      return redirect(res, `com.apex.fitness://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(newUser)))}`, { 'Set-Cookie': clearStateCookie });
+    }
+    return redirect(res, `${frontendUrl}/#auth-success`, { 'Set-Cookie': [...sessionCookie(newUser), clearStateCookie] });
+  },
+
+  'POST /api/auth/google/link': async (req, res) => {
+    const body = await readBody(req);
+    if (!body || !body.token) {
+      return json(res, 400, { error: 'Linking token is required', code: 'missing-token' });
+    }
+
+    const payload = verifyLinkingChallenge(body.token, SECRET);
+    if (!payload) {
+      return json(res, 400, { error: 'Linking token is invalid or expired', code: 'token-expired' });
+    }
+
+    const user = db.users.find(u => u.id === payload.userId);
+    if (!user || user.disabled) {
+      return json(res, 400, { error: 'Account is unavailable', code: 'user-unavailable' });
+    }
+
+    // Verify proof: password or passkey
+    if (typeof body.password === 'string' && body.password) {
+      if (!user.pw?.h || !(await verifyPassword(body.password, user.pw.h))) {
+        audit(req, 'auth.google.link-fail', { user, msg: 'bad-password' });
+        return json(res, 401, { error: 'Incorrect password', code: 'bad-password' });
+      }
+    } else if (body.credential && body.cid) {
+      const proof = await passkeyStepUp(user, body);
+      if (!proof) {
+        audit(req, 'auth.google.link-fail', { user, msg: 'bad-passkey' });
+        return json(res, 401, { error: 'Passkey verification failed', code: 'bad-passkey' });
+      }
+    } else {
+      return json(res, 400, { error: 'Password or passkey verification required', code: 'missing-proof' });
+    }
+
+    // Check if this Google identity was claimed by another account in the meantime
+    const existingLink = (db.federatedIdentities || []).find(f => f.provider === 'google' && f.providerSubject === payload.sub);
+    if (existingLink && existingLink.userId !== user.id) {
+      return json(res, 409, { error: 'This Google account is already linked to another profile', code: 'already-linked' });
+    }
+
+    const fedId = {
+      id: crypto.randomBytes(12).toString('base64url'),
+      userId: user.id,
+      provider: 'google',
+      providerSubject: payload.sub,
+      email: payload.email,
+      emailVerified: true,
+      created: Date.now(),
+      lastLogin: Date.now()
+    };
+
+    db.federatedIdentities = (db.federatedIdentities || []).filter(f => !(f.provider === 'google' && f.providerSubject === payload.sub));
+    db.federatedIdentities.push(fedId);
+    saveDb();
+
+    if (process.env.DATABASE_URL) {
+      try {
+        await dbService.addFederatedIdentity(fedId);
+      } catch (e) {
+        console.error('[PostgreSQL] Link identity error:', e.message);
+      }
+    }
+
+    audit(req, 'auth.google.link-ok', { user, provider: 'google', sub: payload.sub });
+    json(res, 200, {
+      ok: true,
+      user: publicUser(user),
+      token: makeSession(user)
+    }, { 'Set-Cookie': sessionCookie(user) });
+  },
+
+  'GET /api/account/identities': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return notSignedIn(res);
+    const list = (db.federatedIdentities || [])
+      .filter(f => f.userId === user.id)
+      .map(f => ({
+        id: f.id,
+        provider: f.provider,
+        email: f.email,
+        created: f.created,
+        lastLogin: f.lastLogin
+      }));
+    json(res, 200, { identities: list });
+  },
+
+  'DELETE /api/account/identities/google': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return notSignedIn(res);
+    const hasPw = hasPassword(user);
+    const passkeys = passkeyCount(user);
+    if (!hasPw && passkeys === 0) {
+      return json(res, 400, {
+        error: 'Cannot disconnect Google: add a password or passkey first so you can still sign in',
+        code: 'last-auth-method'
+      });
+    }
+    db.federatedIdentities = (db.federatedIdentities || []).filter(f => !(f.userId === user.id && f.provider === 'google'));
+    saveDb();
+    if (process.env.DATABASE_URL) {
+      try {
+        await dbService.deleteFederatedIdentity(user.id, 'google');
+      } catch (e) {
+        console.error('[PostgreSQL] Delete identity error:', e.message);
+      }
+    }
+    audit(req, 'auth.google.unlink', { user });
+    json(res, 200, { ok: true });
+  }
+};
+
 /* ---------- photos & videos of custom exercises (api/media.js) ---------- */
 // One photo, GIF or short video per custom exercise, stored per profile and named by its sha256.
 // The state only ever carries a small ref; the bytes arrive and leave through the routes below.
@@ -1936,6 +2315,7 @@ const routes = {
       invite_only: INVITE_ONLY, allow_guest: ALLOW_GUEST,
       // Only when on, so an instance without passwords answers exactly as it did before (#118).
       ...(PASSWORD_LOGIN ? { password_login: true } : {}),
+      ...(isGoogleAuthEnabled() ? { google_auth: true } : {}),
       // Public: the sign-in screen is the first thing that reads it.
       ...(DEFAULT_LANG ? { default_lang: DEFAULT_LANG } : {}),
       // Public like the two flags above: the caps are not a secret, and the absence of the
@@ -2165,6 +2545,9 @@ const routes = {
   // Always there: more passkeys and device links need nothing an instance has to switch on.
   ...passkeyRoutes,
 
+  // Google OAuth and federated identities
+  ...googleAuthRoutes,
+
   // `rev` is the server's own count of writes to this profile (also stored inside the document as
   // `_rev`, so every other reader of the file — reminder tick, admin, Coach, MCP — is unaffected).
   // A client pushes it back as `baseRev`, and a write over a document it never saw is refused.
@@ -2274,6 +2657,9 @@ const routes = {
     try { text = JSON.stringify(body.state); }
     catch (e) { if (e instanceof RangeError) return json(res, 400, { error: 'invalid state' }); throw e; }
     atomicWrite(stateFile(user.id), text);
+    if (process.env.DATABASE_URL) {
+      dbService.saveUserState(user.id, body.state).catch(e => console.error('[PostgreSQL] State save error:', e.message));
+    }
     // The stat cache cannot see this write on its own: mtime granularity is 4 ms here (ext4 on
     // this kernel — 3901 of 3999 back-to-back same-size writes shared one timestamp), and a
     // `_rev` going from 7 to 8 does not change the file's size, so two writes inside one 4 ms
@@ -2487,6 +2873,9 @@ const routes = {
     presence.delete(u.id);
     // The training history and any Coach credential of theirs, both outside db.json.
     try { fs.unlinkSync(stateFile(u.id)); } catch { /* already gone */ }
+    if (process.env.DATABASE_URL) {
+      dbService.deleteUser(u.id).catch(e => console.error('[PostgreSQL] Delete user error:', e.message));
+    }
     try { coachConfig.clearProfileAuth(u.id); } catch { /* nothing stored */ }
     // Their photos and videos — the one place a profile's folder under uploads/ is removed.
     try { MEDIA.removeUser(u.id); } catch (e) { console.error('media: could not remove uploads of', u.id, e.message); }
@@ -2706,4 +3095,10 @@ server.headersTimeout = 60000;
 // port that was actually bound: with PORT=0 the OS picks one, and a caller that did not choose it
 // (the tests spawn the server that way, and so does anyone running two instances on one box) has
 // no other way to learn it.
-server.listen(PORT, () => console.log(`gym-api on :${server.address().port} (rpID=${RP_ID}, origin=${ORIGIN})`));
+if (process.env.DATABASE_URL) {
+  initDatabaseFromPostgres().catch(e => console.error('[PostgreSQL] Boot error:', e.message)).finally(() => {
+    server.listen(PORT, () => console.log(`gym-api on :${server.address().port} (rpID=${RP_ID}, origin=${ORIGIN})`));
+  });
+} else {
+  server.listen(PORT, () => console.log(`gym-api on :${server.address().port} (rpID=${RP_ID}, origin=${ORIGIN})`));
+}

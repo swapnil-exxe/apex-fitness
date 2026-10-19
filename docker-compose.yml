@@ -11,7 +11,7 @@ services:
     # `--build` matters: with an `image:` also set, compose would otherwise pull the prebuilt
     # default rather than build the coach one.
     build:
-      context: ./api
+      context: ./backend
       target: ${API_TARGET:-default}
     restart: unless-stopped
     env_file: .env
@@ -20,6 +20,7 @@ services:
       # cannot drift — change it in .env and both follow.
       - PORT=${PORT:-3000}
       - DATA_DIR=/data
+      - DATABASE_URL=${DATABASE_URL:-}
       # The API is reachable only through the web container here, and that container overwrites
       # X-Forwarded-For / X-Real-IP with the real peer — so the sign-in throttle may count
       # requests by those headers instead of lumping everyone in as "the web container".

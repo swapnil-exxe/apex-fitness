@@ -423,3 +423,26 @@ export async function passwordRegister(name, password, code, email) {
 export async function passwordResetRedeem(name, code, next) {
   return (await post('/api/login/password-reset', { name, code, next })).user
 }
+
+// Google OAuth 2.0 / OIDC & Federated Identities
+export async function getGoogleAuthUrl(params = {}) {
+  const q = new URLSearchParams()
+  if (params.mobile) q.set('mobile', 'true')
+  if (params.returnTo) q.set('returnTo', params.returnTo)
+  if (params.redirect) q.set('redirect', 'true')
+  const queryStr = q.toString() ? '?' + q.toString() : ''
+  return api('/api/auth/google/url' + queryStr)
+}
+
+export async function googleAuthLink({ token, password, credential, cid }) {
+  return post('/api/auth/google/link', { token, password, credential, cid })
+}
+
+export async function getIdentities() {
+  return (await api('/api/account/identities')).identities
+}
+
+export async function unlinkGoogleIdentity() {
+  return api('/api/account/identities/google', { method: 'DELETE' })
+}
+

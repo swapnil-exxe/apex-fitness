@@ -289,7 +289,8 @@ const iso = d => d.toISOString().slice(0, 10);
 
 export function reviewWindow(S, since) {
   const all = (S.workouts || []).filter(w => w && w.d);
-  const cutoffDate = new Date(); cutoffDate.setDate(cutoffDate.getDate() - MAX_WEEKS * 7);
+  const now = process.env.COACH_REF_DATE ? new Date(process.env.COACH_REF_DATE) : new Date();
+  const cutoffDate = new Date(now); cutoffDate.setDate(cutoffDate.getDate() - MAX_WEEKS * 7);
   const cutoff = iso(cutoffDate);
   const from = since && since > cutoff ? since : cutoff;
   return all.filter(w => w.d >= from).slice(-MAX_SESSIONS);

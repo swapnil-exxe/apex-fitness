@@ -565,6 +565,198 @@ paths:
               schema: { $ref: '#/components/schemas/Ok' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /api/auth/google/status:
+    get:
+      tags: [auth]
+      operationId: googleAuthStatus
+      summary: Check if Google OAuth is configured
+      description: Returns whether Google Sign-In is enabled on this backend instance.
+      security: []
+      responses:
+        '200':
+          description: Configuration status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: { type: boolean }
+              example: { enabled: true }
+
+  /api/auth/google/url:
+    get:
+      tags: [auth]
+      operationId: googleAuthUrl
+      summary: Initiate Google OAuth flow
+      description: |
+        Generates Google OAuth 2.0 authorization URL with PKCE and state parameters.
+        Sets a signed, HTTP-only cookie with state and PKCE verifier.
+      security: []
+      parameters:
+        - name: mobile
+          in: query
+          schema: { type: boolean }
+          description: Whether request originated from Capacitor mobile app
+        - name: returnTo
+          in: query
+          schema: { type: string }
+          description: URL path to return to after login
+        - name: redirect
+          in: query
+          schema: { type: boolean }
+          description: If true, returns 302 redirect directly to Google
+      responses:
+        '200':
+          description: Google authorization URL
+          headers:
+            Set-Cookie:
+              description: Signed OAuth state cookie
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string }
+        '302':
+          description: Direct redirect to Google OAuth login
+        '400':
+          description: Google authentication is not configured
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/auth/google/callback:
+    get:
+      tags: [auth]
+      operationId: googleAuthCallback
+      summary: Google OAuth 2.0 callback
+      description: |
+        Validates authorization code, state cookie, and PKCE verifier.
+        Verifies ID token, resolves or registers user, sets session cookie or redirects mobile.
+      security: []
+      parameters:
+        - name: code
+          in: query
+          schema: { type: string }
+          description: Authorization code returned by Google
+        - name: state
+          in: query
+          schema: { type: string }
+          description: State parameter for CSRF mitigation
+        - name: error
+          in: query
+          schema: { type: string }
+          description: Error code if authentication was cancelled or refused
+      responses:
+        '302':
+          description: Redirects to frontend with session cookie, or to linking prompt, or mobile deep link.
+
+  /api/auth/google/link:
+    post:
+      tags: [auth]
+      operationId: googleAuthLink
+      summary: Link Google account with reauthentication proof
+      description: |
+        Verifies ownership of an existing account via password or passkey and links Google identity.
+        Never merges accounts silently.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  description: Signed linking challenge token
+                password:
+                  type: string
+                  description: Current password if authenticating with password
+                credential:
+                  type: object
+                  description: WebAuthn credential assertion if authenticating with passkey
+                cid:
+                  type: string
+                  description: Challenge ID for WebAuthn assertion
+      responses:
+        '200':
+          description: Account linked and signed in
+          headers:
+            Set-Cookie:
+              description: Sets session cookie
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, const: true }
+                  user: { $ref: '#/components/schemas/PublicUser' }
+                  token: { type: string }
+        '400':
+          description: Invalid or expired challenge token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Incorrect password or passkey verification failure
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Google account already linked to another user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/account/identities:
+    get:
+      tags: [auth]
+      operationId: getAccountIdentities
+      summary: List linked federated identities
+      description: Returns all external identities linked to the authenticated profile.
+      responses:
+        '200':
+          description: List of linked identities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  identities:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        provider: { type: string }
+                        email: { type: string }
+                        created: { type: number }
+                        lastLogin: { type: number }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/account/identities/google:
+    delete:
+      tags: [auth]
+      operationId: unlinkGoogleIdentity
+      summary: Unlink Google account
+      description: Disconnects Google identity provided user has another authentication method.
+      responses:
+        '200':
+          description: Identity disconnected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        '400':
+          description: Cannot unlink sole authentication method
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /api/pair/create:
     post:
       tags: [pairing]

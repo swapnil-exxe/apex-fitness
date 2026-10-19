@@ -38,7 +38,11 @@ const median = arr => {
   const a = arr.filter(n => Number.isFinite(n)).sort((x, y) => x - y);
   return a.length ? a[Math.floor(a.length / 2)] : null;
 };
-const isoDaysAgo = days => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); };
+const isoDaysAgo = days => {
+  const d = process.env.COACH_REF_DATE ? new Date(process.env.COACH_REF_DATE) : new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+};
 
 /** One participant, reduced to what the cohort reads: kg throughout.
  *

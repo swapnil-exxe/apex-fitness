@@ -9,6 +9,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+process.env.COACH_REF_DATE = process.env.COACH_REF_DATE || '2026-08-01';
+
 /* The port a spawned server.js actually bound.
  *
  * Never pick one for it. Opening a listener on 0, reading the port, closing it and handing the

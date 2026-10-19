@@ -27,6 +27,8 @@ import SyncBanner from './components/SyncBanner.jsx'
 import RestTimer from './components/RestTimer.jsx'
 import TimerFlash from './components/TimerFlash.jsx'
 import { openDeviceLinkRedeem } from './components/Passkeys.jsx'
+import { handleAuthUrlHash, openAccountLinking } from './components/GoogleAuth.jsx'
+import { t } from './lib/i18n.js'
 import Login from './views/Login.jsx'
 import MobileOnboarding from './views/MobileOnboarding.jsx'
 import Home from './views/Home.jsx'
@@ -143,6 +145,62 @@ function Shell() {
     linkOffered.current = true
     openDeviceLinkRedeem()
   }, [ready, linkCode])
+
+  // OAuth callback & mobile deep link handling
+  useEffect(() => {
+    handleAuthUrlHash()
+    const onHashChange = () => handleAuthUrlHash()
+    window.addEventListener('hashchange', onHashChange)
+
+    let removeListener = null
+    if (MOBILE) {
+      import('@capacitor/app').then(({ App }) => {
+        App.addListener('appUrlOpen', async data => {
+          if (!data?.url) return
+          const urlStr = data.url
+          if (urlStr.startsWith('com.apex.fitness://auth/callback')) {
+            try {
+              const u = new URL(urlStr)
+              const token = u.searchParams.get('token')
+              const userJson = u.searchParams.get('user')
+              if (token) {
+                const user = userJson ? JSON.parse(decodeURIComponent(userJson)) : null
+                const remoteBase = useStore.getState().config?.api_base || 'https://api.apex.fit'
+                const { setRemoteAuth } = await import('./lib/api.js')
+                const { saveRemoteFile } = await import('./lib/mobile.js')
+                setRemoteAuth(remoteBase, token)
+                await saveRemoteFile({ mode: 'remote', base: remoteBase, token, user })
+                if (user) {
+                  useStore.getState().setUser(user, { adopt: true })
+                  await useStore.getState().adoptProfile(askAddDeviceData)
+                  useUI.getState().toast(t('Welcome back, {0}', user.name))
+                }
+              }
+            } catch (err) {
+              console.error('Failed to parse mobile auth callback', err)
+            }
+          } else if (urlStr.startsWith('com.apex.fitness://auth/link')) {
+            try {
+              const u = new URL(urlStr)
+              const token = u.searchParams.get('token')
+              const email = u.searchParams.get('email')
+              const name = u.searchParams.get('name')
+              if (token) {
+                openAccountLinking({ token, email, name })
+              }
+            } catch (err) {
+              console.error('Failed to parse mobile auth link', err)
+            }
+          }
+        }).then(h => { removeListener = h })
+      }).catch(() => {})
+    }
+
+    return () => {
+      window.removeEventListener('hashchange', onHashChange)
+      if (removeListener?.remove) removeListener.remove()
+    }
+  }, [])
   useEffect(() => {
     const onScroll = () => {
       // Modals pins the body while a sheet is open; scrollY is 0 then, not a position.

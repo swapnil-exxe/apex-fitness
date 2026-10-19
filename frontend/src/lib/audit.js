@@ -51,6 +51,12 @@ const LABELS = {
   'auth.link.fail': 'Adding a device with a code failed',
   // The owner's proof (current password or a passkey) for one of the changes below was refused.
   'auth.proof.fail': 'Confirming a change failed',
+  // Google OAuth 2.0 / federated identities
+  'auth.google.fail': 'Google sign-in failed',
+  'auth.google.link-required': 'Google account linking required',
+  'auth.google.link-ok': 'Linked Google account',
+  'auth.google.link-fail': 'Google account linking failed',
+  'auth.google.unlink': 'Disconnected Google account',
   // The password throttle paused an address; `msg` says for what (password, signup).
   'auth.throttled': 'Too many failed attempts from one address',
   'admin.user.disable': 'Disabled an account',
@@ -93,6 +99,13 @@ const REASONS = {
   'reset-invalid': 'wrong or expired reset code',
   'link-invalid': 'wrong, used or expired device code',
   'passkey-limit': 'the profile already has as many passkeys as it can hold',
+  'missing-code-or-state': 'missing OAuth code or state parameter',
+  'invalid-state': 'invalid or expired OAuth state',
+  'verification-error': 'Google token verification failed',
+  'invite-required': 'registration requires an invite code',
+  'user-disabled': 'the account has been disabled',
+  'bad-passkey': 'the passkey could not be verified',
+  'google': 'Google Sign-In',
   // What an `auth.throttled` pause was for.
   'password': 'wrong passwords or reset codes',
   'signup': 'wrong invite codes on password signup',
