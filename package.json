@@ -2,7 +2,9 @@
   "name": "apex-fitness",
   "private": true,
   "scripts": {
-    "build": "npm --prefix frontend run build"
+    "build": "npm --prefix frontend run build",
+    "test": "npm --prefix backend test && npm --prefix frontend test && node scripts/build-api-docs.mjs --check && node scripts/verify-media-integrity.mjs",
+    "verify:media": "node scripts/verify-media-integrity.mjs"
   },
   "devDependencies": {
     "js-yaml": "^4.1.0"
