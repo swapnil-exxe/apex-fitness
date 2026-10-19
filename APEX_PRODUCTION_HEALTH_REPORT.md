@@ -32,12 +32,12 @@
    - Signed with the standard Android debug certificate, ready for immediate installation on any Android phone.
 
 4. **CI/CD Workflows & Native iOS Archive (100% GREEN)**:
-   - GitHub Actions workflow **`Tests`** ([Run 39338630124](https://github.com/swapnil-exxe/apex-fitness/actions/runs/39338630124)): **`SUCCESS`**.
-   - GitHub Actions workflow **`Build iOS App`** ([Run 39338630022](https://github.com/swapnil-exxe/apex-fitness/actions/runs/39338630022)): **`SUCCESS`**. Native Xcode project compiled on macOS 14 runner, producing `APEX-Fitness.xcarchive` (220 MB).
+   - GitHub Actions workflow **`Tests`** ([Run 39340087122](https://github.com/swapnil-exxe/apex-fitness/actions/runs/39340087122)): **`SUCCESS`**.
+   - GitHub Actions workflow **`Build iOS App`** ([Run 39340086881](https://github.com/swapnil-exxe/apex-fitness/actions/runs/39340086881)): **`SUCCESS`**. Native Xcode project compiled on macOS 14 runner, producing `APEX-Fitness.xcarchive` (220 MB).
 
 5. **Explicit Operational Limitations**:
    - **Physical Device ADB Verification**: While `adb` is present in the local SDK tools, `adb devices` detected no connected physical Android hardware or running emulators on this macOS host. The APK was verified via zip integrity, certificate inspection, and asset analysis, but has not yet been physically booted on a physical phone screen.
-   - **iOS IPA Export**: Locally blocked because `/Applications/Xcode.app` is not installed on this Mac (only Command Line Tools is available). Remotely, GitHub Actions compiled the entire Xcode workspace into `APEX-Fitness.xcarchive` (220 MB, Run ID `39338630022`). Exporting a signed, installable `.ipa` is blocked until Apple Developer distribution certificates and provisioning profiles are configured in GitHub Secrets. Per instructions, no fake IPA was fabricated.
+   - **iOS IPA Export**: Locally blocked because `/Applications/Xcode.app` is not installed on this Mac (only Command Line Tools is available). Remotely, GitHub Actions compiled the entire Xcode workspace into `APEX-Fitness.xcarchive` (220 MB, Run ID `39340086881`). Exporting a signed, installable `.ipa` is blocked until Apple Developer distribution certificates and provisioning profiles are configured in GitHub Secrets. Per instructions, no fake IPA was fabricated.
    - **Vercel Website Access**: The website responds at `https://apex-fitness.vercel.app`. Disabling Vercel SSO deployment protection requires user dashboard interaction.
    - **Google OAuth Live Login**: UI buttons and backend handlers are fully implemented and tested. Activation of the live Google OAuth flow requires user input of `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` into Render Environment settings.
 
@@ -253,7 +253,7 @@ The live integration probe verified the complete multi-device data pipeline:
 * **Status**: **BLOCKED (UNAVAILABLE)**
 * **Archive Path**:
   ```text
-  https://github.com/swapnil-exxe/apex-fitness/actions/runs/39338630022 (Artifact: APEX-Fitness.xcarchive, 220 MB)
+  https://github.com/swapnil-exxe/apex-fitness/actions/runs/39340086881 (Artifact: APEX-Fitness.xcarchive, 220 MB)
   ```
 * **Blocker Reason**:
   1. The local macOS environment lacks `/Applications/Xcode.app` (`xcodebuild` requires the full Xcode IDE).
@@ -297,8 +297,8 @@ The following external actions require user dashboard credentials or hardware:
 * **Current Branch**: `main`
 * **GitHub Push Status**: Synchronized with `origin/main` (`https://github.com/swapnil-exxe/apex-fitness.git`).
 * **CI Workflow Status**:
-  - `Tests` (Run `39338630124`): **`SUCCESS`**
-  - `Build iOS App` (Run `39338630022`): **`SUCCESS`** (`APEX-Fitness.xcarchive`, 220 MB)
+  - `Tests` (Run `39340087122`): **`SUCCESS`**
+  - `Build iOS App` (Run `39340086881`): **`SUCCESS`** (`APEX-Fitness.xcarchive`, 220 MB)
 * **Protected Directory Check**: `/Users/swapnil/Documents/GYM` has **zero** modifications and remains 100% pristine.
 
 ---
