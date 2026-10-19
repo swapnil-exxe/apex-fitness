@@ -1,4 +1,9 @@
 {
+  "name": "apex-fitness",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix frontend run build"
+  },
   "devDependencies": {
     "js-yaml": "^4.1.0"
   }
