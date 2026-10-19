@@ -1,0 +1,9 @@
+{
+  "appId": "com.apex.fitness",
+  "appName": "APEX",
+  "webDir": "dist",
+  "backgroundColor": "#08090d",
+  "android": {
+    "allowMixedContent": true
+  }
+}

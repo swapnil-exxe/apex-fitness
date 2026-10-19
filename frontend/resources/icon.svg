@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="1024" height="1024">
+  <defs>
+    <linearGradient id="apexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F5D4"/>
+      <stop offset="45%" stop-color="#00BAF2"/>
+      <stop offset="100%" stop-color="#0066FF"/>
+    </linearGradient>
+    <linearGradient id="apexAccent" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0066FF"/>
+      <stop offset="100%" stop-color="#7000FF"/>
+    </linearGradient>
+    <linearGradient id="apexGlow" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#00F5D4" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#00BAF2" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="512" height="512" rx="112" fill="#08090D"/>
+  <rect width="510" height="510" x="1" y="1" rx="111" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+
+  <!-- Radial Glow Behind Summit -->
+  <circle cx="256" cy="220" r="160" fill="url(#apexGlow)"/>
+
+  <!-- Main APEX Chevron Peak Structure -->
+  <g filter="url(#shadow)">
+    <!-- Left Ascent Wing -->
+    <path d="M 256 96 L 256 176 L 152 384 L 88 384 Z" fill="url(#apexGrad)"/>
+    
+    <!-- Right Ascent Wing -->
+    <path d="M 256 96 L 256 176 L 360 384 L 424 384 Z" fill="url(#apexGrad)"/>
+    
+    <!-- Central Crossbar / Power Core (Barbell Bridge) -->
+    <polygon points="186,290 326,290 342,322 170,322" fill="url(#apexAccent)"/>
+    
+    <!-- Summit Shard Highlight -->
+    <polygon points="256,120 286,180 226,180" fill="#FFFFFF" opacity="0.95"/>
+    
+    <!-- Precision Chamfer Center Gap -->
+    <line x1="256" y1="96" x2="256" y2="280" stroke="#08090D" stroke-width="4"/>
+  </g>
+</svg>
