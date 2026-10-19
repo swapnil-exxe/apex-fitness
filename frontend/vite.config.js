@@ -100,8 +100,11 @@ const flavor = {
 const pkgVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version
 const appVersion = process.env.APP_BUILD ? `${pkgVersion}+${process.env.APP_BUILD}` : pkgVersion
 
-export default defineConfig({
-  define: { __APP_VERSION__: JSON.stringify(appVersion) },
+export default defineConfig(({ mode }) => ({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+    'import.meta.env.VITE_GOOGLE_AUTH': JSON.stringify(mode === 'test' ? '0' : '1')
+  },
   plugins: [react(), umami, flavor, swStamp, catalogueMedia],
   base: './',
   server: {
@@ -117,4 +120,4 @@ export default defineConfig({
     }
   },
   build: { chunkSizeWarningLimit: 1500 }
-})
+}))

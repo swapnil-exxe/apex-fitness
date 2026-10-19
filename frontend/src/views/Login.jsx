@@ -39,34 +39,34 @@ function RegisterSheet({ close }) {
       else { await pullState(); useUI.getState().toast(t('Welcome, {0}', u.name)) }
     } catch (e) { if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') useUI.getState().toast(passkeyError(e, t('Registration failed'))) }
   }
+  const googleOn = config?.google_auth !== false && Boolean(config?.google_auth || import.meta.env.VITE_GOOGLE_AUTH === '1')
   const choose = pwOn && webauthnOK() && <>
     <Segmented options={[{ value: 'passkey', label: t('Passkey'), icon: 'fingerprint' }, { value: 'password', label: t('Password'), icon: 'key' }]}
       value={how} onChange={setHow} />
     <div style={{ height: 12 }} />
   </>
-  if (pwOn && how === 'password') return <>
-    <h3>{t('Create your profile')}</h3>
-    {choose}
-    <div className="muted small" style={{ marginBottom: 14 }}>{t('Pick a name and a password. You sign in with both.')}</div>
-    <PasswordRegisterForm close={close} inviteOnly={inviteOnly} name={name} setName={setName} code={code} setCode={setCode} />
-  </>
   return <>
     <h3>{t('Create your profile')}</h3>
-    {choose}
-    <div className="muted small" style={{ marginBottom: 14 }}>{t('Pick a name, then confirm with {0}. The passkey lives on your device, so no password needed.', bio())}</div>
-    <input ref={ref} className="input" placeholder={t('Your name')} maxLength={40} value={name} onChange={e => setName(e.target.value)} />
-    {inviteOnly && <>
-      <div style={{ height: 10 }} />
-      <input className="input" placeholder={t('Invite code')} maxLength={40} value={code}
-        onChange={e => setCode(e.target.value.toUpperCase())} style={{ letterSpacing: '.14em', fontWeight: 600, textAlign: 'center' }} />
-      <div className="dim small" style={{ marginTop: 6 }}>{t('This app is invite-only. Enter the code you were given.')}</div>
-    </>}
-    <div style={{ height: 12 }} />
-    <Button variant="primary" onClick={go}>{t('Create passkey')}</Button>
-    {Boolean(config?.google_auth) && !inviteOnly && <>
-      <div style={{ height: 14 }} />
-      <div className="dim small" style={{ marginBottom: 10, textAlign: 'center' }}>{t('— or —')}</div>
+    {googleOn && !inviteOnly && <>
       <GoogleSignInButton onClick={() => { close(); initiateGoogleSignIn() }} label={t('Sign up with Google')} />
+      <div style={{ height: 14 }} />
+      <div className="dim small" style={{ marginBottom: 12, textAlign: 'center' }}>{t('— or create with passkey / password —')}</div>
+    </>}
+    {choose}
+    {pwOn && how === 'password' ? <>
+      <div className="muted small" style={{ marginBottom: 14 }}>{t('Pick a name and a password. You sign in with both.')}</div>
+      <PasswordRegisterForm close={close} inviteOnly={inviteOnly} name={name} setName={setName} code={code} setCode={setCode} />
+    </> : <>
+      <div className="muted small" style={{ marginBottom: 14 }}>{t('Pick a name, then confirm with {0}. The passkey lives on your device, so no password needed.', bio())}</div>
+      <input ref={ref} className="input" placeholder={t('Your name')} maxLength={40} value={name} onChange={e => setName(e.target.value)} />
+      {inviteOnly && <>
+        <div style={{ height: 10 }} />
+        <input className="input" placeholder={t('Invite code')} maxLength={40} value={code}
+          onChange={e => setCode(e.target.value.toUpperCase())} style={{ letterSpacing: '.14em', fontWeight: 600, textAlign: 'center' }} />
+        <div className="dim small" style={{ marginTop: 6 }}>{t('This app is invite-only. Enter the code you were given.')}</div>
+      </>}
+      <div style={{ height: 12 }} />
+      <Button variant="primary" onClick={go}>{t('Create passkey')}</Button>
     </>}
   </>
 }
@@ -76,7 +76,7 @@ export default function Login() {
   const config = useStore(s => s.config)
   const canGuest = guestAllowed(config)
   const pwOn = passwordOn(config)
-  const googleOn = Boolean(config?.google_auth)
+  const googleOn = config?.google_auth !== false && Boolean(config?.google_auth || import.meta.env.VITE_GOOGLE_AUTH === '1')
 
   useEffect(() => {
     handleAuthUrlHash()

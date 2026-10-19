@@ -17,7 +17,9 @@ import { fileURLToPath } from 'node:url'
 import yaml from 'js-yaml'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const specPath = path.join(root, 'api', 'openapi.yaml')
+const specPath = fs.existsSync(path.join(root, 'backend', 'openapi.yaml'))
+  ? path.join(root, 'backend', 'openapi.yaml')
+  : path.join(root, 'api', 'openapi.yaml')
 const outPath = path.join(root, 'website', 'api.html')
 const check = process.argv.includes('--check')
 const spec = yaml.load(fs.readFileSync(specPath, 'utf8'))

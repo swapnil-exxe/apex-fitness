@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "framework": "vite",
   "installCommand": "npm --prefix frontend install",
   "buildCommand": "npm --prefix frontend run build",
@@ -11,7 +10,7 @@
     },
     {
       "source": "/exercise-media/:path*",
-      "destination": "https://apex-fitness-fd32.onrender.com/exercise-media/:path*"
+      "destination": "https://duartesantos8.github.io/openGym/exercise-media/:path*"
     },
     {
       "source": "/(.*)",

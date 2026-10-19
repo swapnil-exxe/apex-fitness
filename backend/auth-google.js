@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { OAuth2Client } from 'google-auth-library';
 
 export function isGoogleAuthEnabled() {
-  return Boolean(process.env.GOOGLE_CLIENT_ID);
+  return Boolean(process.env.GOOGLE_CLIENT_ID || process.env.ENABLE_GOOGLE_AUTH === '1' || process.env.GOOGLE_AUTH === '1' || process.env.GOOGLE_AUTH === 'true');
 }
 
 export function getGoogleConfig(origin) {

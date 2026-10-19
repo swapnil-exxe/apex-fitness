@@ -165,7 +165,7 @@ function Shell() {
               const userJson = u.searchParams.get('user')
               if (token) {
                 const user = userJson ? JSON.parse(decodeURIComponent(userJson)) : null
-                const remoteBase = useStore.getState().config?.api_base || 'https://api.apex.fit'
+                const remoteBase = useStore.getState().config?.api_base || 'https://apex-fitness-fd32.onrender.com'
                 const { setRemoteAuth } = await import('./lib/api.js')
                 const { saveRemoteFile } = await import('./lib/mobile.js')
                 setRemoteAuth(remoteBase, token)

@@ -245,7 +245,7 @@ main.api-main .lead { color: var(--fg-2); max-width: 58ch; margin: 14px 0 0; fon
   <p class="api-facts">
     <span>OpenAPI 3.1.0</span>
     <span>openGym v1.4.1</span>
-    <span>69 endpoints</span>
+    <span>75 endpoints</span>
     <span>AGPL-3.0-or-later</span>
   </p>
 
@@ -583,6 +583,223 @@ main.api-main .lead { color: var(--fg-2); max-width: 58ch; margin: 14px 0 0; fon
   <div class="prow rrow">
     <span class="r-code s2">200</span>
     <span class="p-desc">All sessions revoked.<span class="r-sig"><a href="#schema-Ok">Ok</a> &middot; sets <code>Set-Cookie</code></span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">401</span>
+    <span class="p-desc">No session, expired/revoked session, or a disabled account.<span class="r-sig"><code>{&quot;error&quot;:&quot;not signed in&quot;}</code></span></span>
+  </div>
+    </div>
+  </div>
+</details>
+
+<details class="ep" id="op-googleAuthStatus">
+  <summary>
+    <span class="m get">GET</span>
+    <span class="ep-path"><code>/api/auth/google/status</code><span class="ep-chip public">public</span></span>
+    <span class="ep-chev" aria-hidden="true"></span>
+    <span class="ep-sum">Check if Google OAuth is configured</span>
+  </summary>
+  <div class="ep-body">
+<p>Returns whether Google Sign-In is enabled on this backend instance.</p>
+    <p class="ep-auth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Public: no authentication required.</span></p>
+
+
+    <p class="ep-h">Responses</p>
+    <div class="ptab">
+  <div class="prow rrow">
+    <span class="r-code s2">200</span>
+    <span class="p-desc">Configuration status<span class="r-sig">{ enabled: boolean }</span></span>
+  </div>
+    </div>
+  </div>
+</details>
+
+<details class="ep" id="op-googleAuthUrl">
+  <summary>
+    <span class="m get">GET</span>
+    <span class="ep-path"><code>/api/auth/google/url</code><span class="ep-chip public">public</span></span>
+    <span class="ep-chev" aria-hidden="true"></span>
+    <span class="ep-sum">Initiate Google OAuth flow</span>
+  </summary>
+  <div class="ep-body">
+<p>Generates Google OAuth 2.0 authorization URL with PKCE and state parameters. Sets a signed, HTTP-only cookie with state and PKCE verifier.</p>
+    <p class="ep-auth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Public: no authentication required.</span></p>
+<p class="ep-h">Query parameters</p><div class="ptab">
+  <div class="prow">
+    <span class="p-name">mobile</span>
+    <span class="p-type">boolean</span>
+    <span class="p-desc">Whether request originated from Capacitor mobile app</span>
+  </div>
+  <div class="prow">
+    <span class="p-name">returnTo</span>
+    <span class="p-type">string</span>
+    <span class="p-desc">URL path to return to after login</span>
+  </div>
+  <div class="prow">
+    <span class="p-name">redirect</span>
+    <span class="p-type">boolean</span>
+    <span class="p-desc">If true, returns 302 redirect directly to Google</span>
+  </div>
+</div>
+
+    <p class="ep-h">Responses</p>
+    <div class="ptab">
+  <div class="prow rrow">
+    <span class="r-code s2">200</span>
+    <span class="p-desc">Google authorization URL<span class="r-sig">{ url: string } &middot; sets <code>Set-Cookie</code></span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s3">302</span>
+    <span class="p-desc">Direct redirect to Google OAuth login</span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">400</span>
+    <span class="p-desc">Google authentication is not configured</span>
+  </div>
+    </div>
+  </div>
+</details>
+
+<details class="ep" id="op-googleAuthCallback">
+  <summary>
+    <span class="m get">GET</span>
+    <span class="ep-path"><code>/api/auth/google/callback</code><span class="ep-chip public">public</span></span>
+    <span class="ep-chev" aria-hidden="true"></span>
+    <span class="ep-sum">Google OAuth 2.0 callback</span>
+  </summary>
+  <div class="ep-body">
+<p>Validates authorization code, state cookie, and PKCE verifier. Verifies ID token, resolves or registers user, sets session cookie or redirects mobile.</p>
+    <p class="ep-auth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Public: no authentication required.</span></p>
+<p class="ep-h">Query parameters</p><div class="ptab">
+  <div class="prow">
+    <span class="p-name">code</span>
+    <span class="p-type">string</span>
+    <span class="p-desc">Authorization code returned by Google</span>
+  </div>
+  <div class="prow">
+    <span class="p-name">state</span>
+    <span class="p-type">string</span>
+    <span class="p-desc">State parameter for CSRF mitigation</span>
+  </div>
+  <div class="prow">
+    <span class="p-name">error</span>
+    <span class="p-type">string</span>
+    <span class="p-desc">Error code if authentication was cancelled or refused</span>
+  </div>
+</div>
+
+    <p class="ep-h">Responses</p>
+    <div class="ptab">
+  <div class="prow rrow">
+    <span class="r-code s3">302</span>
+    <span class="p-desc">Redirects to frontend with session cookie, or to linking prompt, or mobile deep link.</span>
+  </div>
+    </div>
+  </div>
+</details>
+
+<details class="ep" id="op-googleAuthLink">
+  <summary>
+    <span class="m post">POST</span>
+    <span class="ep-path"><code>/api/auth/google/link</code><span class="ep-chip public">public</span></span>
+    <span class="ep-chev" aria-hidden="true"></span>
+    <span class="ep-sum">Link Google account with reauthentication proof</span>
+  </summary>
+  <div class="ep-body">
+<p>Verifies ownership of an existing account via password or passkey and links Google identity. Never merges accounts silently.</p>
+    <p class="ep-auth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Public: no authentication required.</span></p>
+
+<p class="ep-h">Request body <span class="p-hint">(JSON)</span></p><div class="ptab">
+  <div class="prow">
+    <span class="p-name">token<em class="p-req" title="required">required</em></span>
+    <span class="p-type">string</span>
+    <span class="p-desc">Signed linking challenge token</span>
+  </div>
+  <div class="prow">
+    <span class="p-name">password</span>
+    <span class="p-type">string</span>
+    <span class="p-desc">Current password if authenticating with password</span>
+  </div>
+  <div class="prow">
+    <span class="p-name">credential</span>
+    <span class="p-type">object</span>
+    <span class="p-desc">WebAuthn credential assertion if authenticating with passkey</span>
+  </div>
+  <div class="prow">
+    <span class="p-name">cid</span>
+    <span class="p-type">string</span>
+    <span class="p-desc">Challenge ID for WebAuthn assertion</span>
+  </div>
+</div>
+    <p class="ep-h">Responses</p>
+    <div class="ptab">
+  <div class="prow rrow">
+    <span class="r-code s2">200</span>
+    <span class="p-desc">Account linked and signed in<span class="r-sig">{ ok: always true, user: <a href="#schema-PublicUser">PublicUser</a>, token: string } &middot; sets <code>Set-Cookie</code></span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">400</span>
+    <span class="p-desc">Invalid or expired challenge token</span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">401</span>
+    <span class="p-desc">Incorrect password or passkey verification failure</span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">409</span>
+    <span class="p-desc">Google account already linked to another user</span>
+  </div>
+    </div>
+  </div>
+</details>
+
+<details class="ep" id="op-getAccountIdentities">
+  <summary>
+    <span class="m get">GET</span>
+    <span class="ep-path"><code>/api/account/identities</code></span>
+    <span class="ep-chev" aria-hidden="true"></span>
+    <span class="ep-sum">List linked federated identities</span>
+  </summary>
+  <div class="ep-body">
+<p>Returns all external identities linked to the authenticated profile.</p>
+    <p class="ep-auth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Requires a session: the cookie set at sign-in, or <code>Authorization: Bearer &lt;token&gt;</code> from mobile-app pairing.</span></p>
+
+
+    <p class="ep-h">Responses</p>
+    <div class="ptab">
+  <div class="prow rrow">
+    <span class="r-code s2">200</span>
+    <span class="p-desc">List of linked identities<span class="r-sig">{ identities: object[] }</span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">401</span>
+    <span class="p-desc">No session, expired/revoked session, or a disabled account.<span class="r-sig"><code>{&quot;error&quot;:&quot;not signed in&quot;}</code></span></span>
+  </div>
+    </div>
+  </div>
+</details>
+
+<details class="ep" id="op-unlinkGoogleIdentity">
+  <summary>
+    <span class="m delete">DELETE</span>
+    <span class="ep-path"><code>/api/account/identities/google</code></span>
+    <span class="ep-chev" aria-hidden="true"></span>
+    <span class="ep-sum">Unlink Google account</span>
+  </summary>
+  <div class="ep-body">
+<p>Disconnects Google identity provided user has another authentication method.</p>
+    <p class="ep-auth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Requires a session: the cookie set at sign-in, or <code>Authorization: Bearer &lt;token&gt;</code> from mobile-app pairing.</span></p>
+
+
+    <p class="ep-h">Responses</p>
+    <div class="ptab">
+  <div class="prow rrow">
+    <span class="r-code s2">200</span>
+    <span class="p-desc">Identity disconnected<span class="r-sig"><a href="#schema-Ok">Ok</a></span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">400</span>
+    <span class="p-desc">Cannot unlink sole authentication method</span>
   </div>
   <div class="prow rrow">
     <span class="r-code s4">401</span>
