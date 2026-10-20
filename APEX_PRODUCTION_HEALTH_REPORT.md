@@ -40,7 +40,7 @@
    - **Physical Device ADB Verification**: While `adb` is present in the local SDK tools, `adb devices` detected no connected physical Android hardware or running emulators on this macOS host. The APK was verified via zip integrity, certificate inspection, and asset analysis, but has not yet been physically booted on a physical phone screen.
    - **iOS IPA Export**: Locally blocked because `/Applications/Xcode.app` is not installed on this Mac (only Command Line Tools is available). Remotely, GitHub Actions compiled the entire Xcode workspace into `APEX-Fitness.xcarchive` (220 MB, Run ID `39401650887`). Exporting a signed, installable `.ipa` is blocked until Apple Developer distribution certificates and provisioning profiles are configured in GitHub Secrets. Per instructions, no fake IPA was fabricated.
    - **Vercel Website Access**: The website responds at `https://apex-fitness.vercel.app`. Disabling Vercel SSO deployment protection requires user dashboard interaction.
-   - **Google OAuth Live Login**: UI buttons and backend handlers are fully implemented and tested. Activation of the live Google OAuth flow requires user input of `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` into Render Environment settings.
+   - **Google OAuth Live Login**: **CONFIGURED & ACTIVE**. Client ID and Client Secret configured in Render and Google Cloud Console (`apex-fitness-512120`). Render endpoint `GET /api/auth/google/status` returns `{"enabled": true}` and `GET /api/auth/google/url` actively generates Google OAuth 2.0 PKCE authorization URLs. *Note: In Testing mode, Google restricts logins to test users added in Google Cloud Console Audience.*
 
 ---
 
@@ -275,14 +275,9 @@ The following external actions require user dashboard credentials or hardware:
 1. **Vercel Dashboard — Public Website Access**:
    - Go to: **Vercel Dashboard ➔ Project Settings ➔ Deployment Protection**.
    - Turn **OFF** "Vercel Authentication" so public traffic and web views can load `https://apex-fitness.vercel.app` without redirection to `sso-api`.
-2. **Render Dashboard — Enable Google OAuth**:
-   - In Google Cloud Console, add Authorized Redirect URI: `https://apex-fitness-fd32.onrender.com/api/auth/google/callback`.
-   - In Render Dashboard (service `apex-fitness-fd32`), add environment variables:
-     - `GOOGLE_CLIENT_ID`: `<your-client-id>`
-     - `GOOGLE_CLIENT_SECRET`: `<your-client-secret>`
-     - `GOOGLE_REDIRECT_URI`: `https://apex-fitness-fd32.onrender.com/api/auth/google/callback`
-     - `FRONTEND_URL`: `https://apex-fitness.vercel.app`
-     - `ENABLE_GOOGLE_AUTH`: `1`
+2. **Google Cloud Console — Add Test Users / Publish**:
+   - Status: **OAuth Client Configured (`256574019436-...`) & Active on Render**.
+   - If the OAuth consent screen is in "Testing" mode: Go to **Google Cloud Console ➔ Audience / Test Users** and add any Google accounts (e.g. `your-email@gmail.com`) that should be allowed to sign in, or click "Publish App" for open public signup.
 3. **GitHub Secrets — iOS Code Signing (for App Store / TestFlight)**:
    - Add the following repository secrets to enable automatic `.ipa` generation:
      - `APPLE_CERTIFICATE_BASE64`: Base64-encoded `.p12` certificate.
