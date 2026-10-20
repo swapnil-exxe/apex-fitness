@@ -26,7 +26,7 @@
    - HTTP Range seeking (`206 Partial Content`) verified on remote CDN video streams.
 
 3. **Android Application Package (100% BUILT & DELIVERED)**:
-   - Fresh, fully bundled Android APK compiled and delivered at `/Users/swapnil/Documents/APEX-clean/release/APEX-Fitness-Android.apk` (**227 MB**, 238,380,608 bytes, build timestamp `2026-10-20 13:50:14`).
+   - Fresh, fully bundled Android APK compiled and delivered at `/Users/swapnil/Documents/APEX-clean/release/APEX-Fitness-Android.apk` (**227 MB**, 238,380,608 bytes, build timestamp `2026-10-20 16:08:22`, SHA-256: `a45c871e...`).
    - Application ID verified as exactly **`com.apex.fitness`** (debug suffix `.test` removed from `build.gradle`).
    - Inlines the verified production Render backend URL (`https://apex-fitness-fd32.onrender.com`).
    - Bundles all 6,554 stills and 6,554 animation clips for **100% offline media functionality** with zero grey dumbbell placeholders.
@@ -234,7 +234,8 @@ The live integration probe verified the complete multi-device data pipeline agai
   /Users/swapnil/Documents/APEX-clean/frontend/android/app/build/outputs/apk/debug/app-debug.apk
   ```
 * **File Size**: **227 MB (238,380,608 bytes)**
-* **Build Timestamp**: `2026-10-20 13:50:14`
+* **Build Timestamp**: `2026-10-20 16:08:22`
+* **SHA-256 Checksum**: `a45c871e77339565ae9d12f4dd317e26b0f3dd66dbf077abc425ddc2c9795cef` (verified 100% identical between build output and release copy)
 * **File Existence & Integrity**: **CONFIRMED** (`unzip -t` passed with 0 errors).
 * **Build Type**: Android Debug APK (`assembleDebug`).
 * **Application ID**: **`com.apex.fitness`** (verified via `aapt dump badging`, debug suffix removed).
@@ -247,7 +248,7 @@ The live integration probe verified the complete multi-device data pipeline agai
   ```bash
   adb install -r /Users/swapnil/Documents/APEX-clean/release/APEX-Fitness-Android.apk
   ```
-* **Physical Device Test Status**: Not tested on a physical device screen (no physical Android device or emulator currently connected via ADB). Verified via byte-level archive inspection, certificate validation, and live cloud protocol testing.
+* **Physical Device Test Status**: **NOT TESTED** on a physical device screen (no physical Android device or emulator currently connected via ADB). Verified via byte-level archive inspection, certificate validation, and live cloud protocol testing.
 
 ### 2. iOS Application Package (IPA)
 

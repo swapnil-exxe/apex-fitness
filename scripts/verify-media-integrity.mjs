@@ -134,7 +134,7 @@ async function run() {
   // 6. Test HTTP Range request on CDN
   console.log('\nVerifying Remote CDN HTTP Range Seeking Support:')
   try {
-    const rangeOut = execSync('curl -s -r 0-1023 -i "https://duartesantos8.github.io/openGym/exercise-media/clip/4209.mp4" | head -n 15').toString()
+    const rangeOut = execSync('curl -s -r 0-1023 -i "https://duartesantos8.github.io/openGym/exercise-media/clip/4209.mp4" | head -n 30').toString()
     const is206 = rangeOut.includes('HTTP/2 206') || rangeOut.includes('HTTP/1.1 206')
     const hasRanges = rangeOut.toLowerCase().includes('accept-ranges: bytes')
     const hasRangeHeader = rangeOut.toLowerCase().includes('content-range: bytes 0-1023/52852')
