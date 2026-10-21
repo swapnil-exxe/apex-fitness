@@ -42,6 +42,7 @@ docs/superpowers/plans/
 *.aab
 *.ipa
 builds/
+release/
 icon/
 frontend/android/local.properties
 frontend/android/app/build/

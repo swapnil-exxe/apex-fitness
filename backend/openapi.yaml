@@ -1,15 +1,15 @@
-# openGym HTTP API: hand-written OpenAPI 3.1 spec.
+# APEX Fitness HTTP API: hand-written OpenAPI 3.1 spec.
 # Source of truth: api/server.js (a single framework-free Node file). Every route the
 # server registers is documented here; if you add a route there, add it here too.
-# Browsable version: https://opengym.ch/api.html
+# Browsable version: https://apex-fitness.vercel.app/api.html
 openapi: 3.1.0
 
 info:
-  title: openGym API
+  title: APEX Fitness API
   version: 1.4.1
-  summary: Passkey (WebAuthn) auth + per-user state storage for openGym
+  summary: Passkey (WebAuthn) auth + per-user state storage for APEX Fitness
   description: |
-    The backend of [openGym](https://opengym.ch), a free, open-source
+    The backend of [APEX Fitness](https://apex-fitness.vercel.app), a modern
     gym & body-weight tracker. A plain Node server, no framework, JSON-file storage,
     HMAC-signed session cookies.
 
@@ -115,14 +115,14 @@ info:
     name: AGPL-3.0-or-later
     identifier: AGPL-3.0-or-later
   contact:
-    name: openGym
-    url: https://gitlab.com/DuarteSantos8/opengym
+    name: APEX Fitness
+    url: https://github.com/swapnil-exxe/apex-fitness
 
 servers:
   - url: /
-    description: Same origin as the openGym web app (the normal deployment)
-  - url: https://opengym.example.com
-    description: Your self-hosted instance
+    description: Same origin as the APEX Fitness web app (the normal deployment)
+  - url: https://apex-fitness-fd32.onrender.com
+    description: Production APEX backend
 
 tags:
   - name: meta

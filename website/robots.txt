@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://opengym.ch/sitemap.xml
+Sitemap: https://apex-fitness.vercel.app/sitemap.xml

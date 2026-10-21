@@ -171,15 +171,13 @@ export function matchesExerciseSearch(exercise, query) {
   return searchScore(exercise, query) > 0
 }
 
-// Media normally sits next to the app (img/ and gif/, mounted into the web container).
-// A build can point them somewhere else — the demo build pulls them off a CDN instead of
-// shipping ~140 MB of images into the deployment. `import.meta.env` is undefined in plain
-// Node; the guard keeps this module loadable without Vite.
+// Media normally sits next to the app (exercise-media/still and /clip).
+// A build or deployment can point them to an APEX-controlled storage bucket or CDN via
+// VITE_MEDIA_CDN_URL or VITE_APEX_MEDIA_CDN. `import.meta.env` is guarded for plain Node.
 const ENV = import.meta.env || {}
-// Under their own folder since v1.4.0: a docker-compose.yml from before then still mounts the old
-// dataset's media over img/ and gif/, and would hide the catalogue's files if they lived there.
-const IMG_BASE = ENV.VITE_IMG_BASE || 'exercise-media/still/'
-const GIF_BASE = ENV.VITE_GIF_BASE || 'exercise-media/clip/'
+const MEDIA_CDN = (ENV.VITE_MEDIA_CDN_URL || ENV.VITE_APEX_MEDIA_CDN || '').replace(/\/$/, '')
+const IMG_BASE = ENV.VITE_IMG_BASE || (MEDIA_CDN ? `${MEDIA_CDN}/still/` : 'exercise-media/still/')
+const GIF_BASE = ENV.VITE_GIF_BASE || (MEDIA_CDN ? `${MEDIA_CDN}/clip/` : 'exercise-media/clip/')
 // The animations are MP4 loops, except in the Android release: there they are animated WebP
 // (VITE_CLIP_EXT=webp, staged from APP_MEDIA_DIR), shown as a plain image. The WebView's video
 // player stalled at every loop of these 3-second clips on real phones; an image decodes like the
@@ -205,8 +203,8 @@ export const ENHANCED_EXERCISE_IDS = new Set([
 ])
 export const hasEnhancedDerivative = ex => !!ex && ENHANCED_EXERCISE_IDS.has(String(ex.id || ''))
 
-const ENHANCED_IMG_BASE = ENV.VITE_ENHANCED_IMG_BASE || 'exercise-media/enhanced/still/'
-const ENHANCED_GIF_BASE = ENV.VITE_ENHANCED_GIF_BASE || 'exercise-media/enhanced/clip/'
+const ENHANCED_IMG_BASE = ENV.VITE_ENHANCED_IMG_BASE || (MEDIA_CDN ? `${MEDIA_CDN}/enhanced/still/` : 'exercise-media/enhanced/still/')
+const ENHANCED_GIF_BASE = ENV.VITE_ENHANCED_GIF_BASE || (MEDIA_CDN ? `${MEDIA_CDN}/enhanced/clip/` : 'exercise-media/enhanced/clip/')
 
 export const enhancedImgSrc = (ex, figure) => {
   if (!hasEnhancedDerivative(ex)) return null

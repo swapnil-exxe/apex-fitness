@@ -3,7 +3,7 @@
 // that come from the GitHub API (repo counts, release timeline).
 // Every one of them fails soft: the page is complete without any of this running.
 
-const GH_REPO = 'https://api.github.com/repos/DuarteSantos8/openGym'
+const GH_REPO = 'https://api.github.com/repos/swapnil-exxe/apex-fitness'
 
 // Discord publishes an invite's guild counts to anyone who asks for the invite with
 // ?with_counts=1. No bot token, no widget to enable, and the API reflects the caller's
@@ -226,7 +226,7 @@ function panel({ opener, panelEl, flag, closeBtn }) {
     slot.dataset.mounted = '1'
     const f = document.createElement('iframe')
     f.src = slot.dataset.demo
-    f.title = 'openGym live demo'
+    f.title = 'APEX Fitness live demo'
     f.loading = 'lazy'
     f.style.cssText = 'width:100%;height:100%;border:0;display:block;border-radius:34px;background:#000'
     slot.appendChild(f)
