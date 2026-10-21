@@ -1,0 +1,515 @@
+{
+  "pipeline_version": "1.0.0",
+  "tier_architecture": {
+    "Tier A": "Original Master (180x180 px, immutable upstream source)",
+    "Tier B": "High-Resolution Source (native 720p/1080p/4K upstream when verified; 0 public native upstream exist)",
+    "Tier C": "Enhanced Upscale (720x720 px Lanczos-sinc high-order derivative, zero AI distortion)"
+  },
+  "target_resolution": "720x720",
+  "items": [
+    {
+      "id": "0001",
+      "type": "still",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "Lanczos-4 sinc windowed interpolation (lossless WebP)",
+      "source": {
+        "file": "still/0001.webp",
+        "resolution": "180x180",
+        "bytes": 5092,
+        "sha256": "5c81e0a0a921f8257895285cd42fd9548aecaa4602a94673232960961ebb38ae",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/still/0001.webp",
+        "resolution": "720x720",
+        "bytes": 74724,
+        "sha256": "acc02d605f4006a01208bc8b84c8a83618d6755d81ceb08112b59b04f1c041c0",
+        "reconstruction_psnr_db": 39.41
+      }
+    },
+    {
+      "id": "0001",
+      "type": "clip",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "FFmpeg Lanczos sharp scaling, libx264 slow CRF 16 tune=animation",
+      "source": {
+        "file": "clip/0001.mp4",
+        "resolution": "180x180",
+        "fps": "10/1",
+        "nb_frames": "12",
+        "bytes": 21071,
+        "sha256": "cadff6b44ab736b84f24a31a145b375662b918e240bfe42dd2ee84fc77bb570e",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/clip/0001.mp4",
+        "resolution": "720x720",
+        "fps": "10/1",
+        "bytes": 118500,
+        "sha256": "69e044dc0f968d7f44d122410013dfba1752cd6cef90ae8ff76340394ae1d6df"
+      }
+    },
+    {
+      "id": "0002",
+      "type": "still",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "Lanczos-4 sinc windowed interpolation (lossless WebP)",
+      "source": {
+        "file": "still/0002.webp",
+        "resolution": "180x180",
+        "bytes": 6058,
+        "sha256": "742725878c50c9ab050d6cf40909ff64e15c6e4a7ae0c17e8d504e0c74baa1b0",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/still/0002.webp",
+        "resolution": "720x720",
+        "bytes": 80992,
+        "sha256": "044c775d2ce4c8bbd8026d504e3ff2d16e0de0c87a248810d22426750a90bcd4",
+        "reconstruction_psnr_db": 37.39
+      }
+    },
+    {
+      "id": "0002",
+      "type": "clip",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "FFmpeg Lanczos sharp scaling, libx264 slow CRF 16 tune=animation",
+      "source": {
+        "file": "clip/0002.mp4",
+        "resolution": "180x180",
+        "fps": "10/1",
+        "nb_frames": "12",
+        "bytes": 22463,
+        "sha256": "d0ae3df2b159eef39a4cf7a48c899d050d47d63c32c9484b16e2f14350040dc3",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/clip/0002.mp4",
+        "resolution": "720x720",
+        "fps": "10/1",
+        "bytes": 90721,
+        "sha256": "b4e5a2b20c7cdd231ec3579ea9bde2926c1dce56037c9b1c7e5eaf5fc6099fa6"
+      }
+    },
+    {
+      "id": "0007",
+      "type": "still",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "Lanczos-4 sinc windowed interpolation (lossless WebP)",
+      "source": {
+        "file": "still/0007.webp",
+        "resolution": "180x180",
+        "bytes": 4850,
+        "sha256": "236374c2512750c787d8379f84bebf6b7a10b530b8014e76f2c6b2b94e6c619b",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/still/0007.webp",
+        "resolution": "720x720",
+        "bytes": 59400,
+        "sha256": "29a2ece45dc37e56b6ff091cd60e53371f5314a32b91cdcda92af04f4ea5fb8c",
+        "reconstruction_psnr_db": 38.89
+      }
+    },
+    {
+      "id": "0007",
+      "type": "clip",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "FFmpeg Lanczos sharp scaling, libx264 slow CRF 16 tune=animation",
+      "source": {
+        "file": "clip/0007.mp4",
+        "resolution": "180x180",
+        "fps": "10/1",
+        "nb_frames": "12",
+        "bytes": 17686,
+        "sha256": "1d3563307ee3a16c4607480b1edc208721d1a1fd1ad01892d1f0502e78089d75",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/clip/0007.mp4",
+        "resolution": "720x720",
+        "fps": "10/1",
+        "bytes": 62197,
+        "sha256": "1c6a6512a91a45e5acf9faa3423d5536a8fd080b8bfd90fe40552134a9a9bf37"
+      }
+    },
+    {
+      "id": "0027",
+      "type": "still",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "Lanczos-4 sinc windowed interpolation (lossless WebP)",
+      "source": {
+        "file": "still/0027.webp",
+        "resolution": "180x180",
+        "bytes": 6290,
+        "sha256": "88e0a7d06515ab3855f0e7c60b43a6ca04e9d991b25ae8e60d0617b678d4b510",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/still/0027.webp",
+        "resolution": "720x720",
+        "bytes": 96798,
+        "sha256": "9b10bad1d6387776990b9180ae5f68fee80dfdd72b5a9c82dc03210148f9d9a5",
+        "reconstruction_psnr_db": 38.27
+      }
+    },
+    {
+      "id": "0027",
+      "type": "clip",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "FFmpeg Lanczos sharp scaling, libx264 slow CRF 16 tune=animation",
+      "source": {
+        "file": "clip/0027.mp4",
+        "resolution": "180x180",
+        "fps": "10/1",
+        "nb_frames": "12",
+        "bytes": 26754,
+        "sha256": "a42f27bdbb59145ae3693fd04dbcf5da2ddc389786b5d136e989a3a6410044b3",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/clip/0027.mp4",
+        "resolution": "720x720",
+        "fps": "10/1",
+        "bytes": 123383,
+        "sha256": "7f000b04a6382d5635b7adc8b103dcdd5deb9f933073e104ab498c23dea266cd"
+      }
+    },
+    {
+      "id": "0032",
+      "type": "still",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "Lanczos-4 sinc windowed interpolation (lossless WebP)",
+      "source": {
+        "file": "still/0032.webp",
+        "resolution": "180x180",
+        "bytes": 4628,
+        "sha256": "ea295043f2d18deffb38ee5ee70ae5a859dacfcbeffa06d56bf95c080f6391f9",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/still/0032.webp",
+        "resolution": "720x720",
+        "bytes": 67564,
+        "sha256": "3c62c7672430fe2876c1ff90333c48c8b3df2c7f3663aee862078f830683fc3f",
+        "reconstruction_psnr_db": 39.21
+      }
+    },
+    {
+      "id": "0032",
+      "type": "clip",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "FFmpeg Lanczos sharp scaling, libx264 slow CRF 16 tune=animation",
+      "source": {
+        "file": "clip/0032.mp4",
+        "resolution": "180x180",
+        "fps": "10/1",
+        "nb_frames": "12",
+        "bytes": 40276,
+        "sha256": "3fcf2e993ab10439bce2794dc93caca17f1e0374267bce2958da5863e8b5517d",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/clip/0032.mp4",
+        "resolution": "720x720",
+        "fps": "10/1",
+        "bytes": 122347,
+        "sha256": "3822be28f16111213474d497cb725b424219c3a8ddc14835478bf02020bb19af"
+      }
+    },
+    {
+      "id": "0043",
+      "type": "still",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "Lanczos-4 sinc windowed interpolation (lossless WebP)",
+      "source": {
+        "file": "still/0043.webp",
+        "resolution": "180x180",
+        "bytes": 5430,
+        "sha256": "1b2fafc4eab453cf3b686f2bebc59e1eae6ee4f70e33e67e2bcdcc61eebffa51",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/still/0043.webp",
+        "resolution": "720x720",
+        "bytes": 79076,
+        "sha256": "97508b142550533b8668f3195fd7f8034c842aaeb582b584e8bea0e73566a4dd",
+        "reconstruction_psnr_db": 38.38
+      }
+    },
+    {
+      "id": "0043",
+      "type": "clip",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "FFmpeg Lanczos sharp scaling, libx264 slow CRF 16 tune=animation",
+      "source": {
+        "file": "clip/0043.mp4",
+        "resolution": "180x180",
+        "fps": "10/1",
+        "nb_frames": "12",
+        "bytes": 23149,
+        "sha256": "2954f5880dec6400e4464684e9dc10d5ce2705eb2ae7b3251cbc500e26c19ae9",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/clip/0043.mp4",
+        "resolution": "720x720",
+        "fps": "10/1",
+        "bytes": 134455,
+        "sha256": "1d40b038767f3ffe41603170d2415d97d62e1fd17ddaca4701f75020d7a67472"
+      }
+    },
+    {
+      "id": "0293",
+      "type": "still",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "Lanczos-4 sinc windowed interpolation (lossless WebP)",
+      "source": {
+        "file": "still/0293.webp",
+        "resolution": "180x180",
+        "bytes": 7516,
+        "sha256": "8c02895ba19cbc7baeb16ee45cd1db6498dd8c8dd52e7d041c89c7afe875fb9a",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/still/0293.webp",
+        "resolution": "720x720",
+        "bytes": 117722,
+        "sha256": "e855c553654a4c2bb03f68dc29730f05fd109ad49c9de4639cfb6247ce12698f",
+        "reconstruction_psnr_db": 38.06
+      }
+    },
+    {
+      "id": "0293",
+      "type": "clip",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "FFmpeg Lanczos sharp scaling, libx264 slow CRF 16 tune=animation",
+      "source": {
+        "file": "clip/0293.mp4",
+        "resolution": "180x180",
+        "fps": "10/1",
+        "nb_frames": "12",
+        "bytes": 29346,
+        "sha256": "b8b84710aca132ad8f4d6a97ef919cbab4eefb89aa5f0675b598782823787d6b",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/clip/0293.mp4",
+        "resolution": "720x720",
+        "fps": "10/1",
+        "bytes": 114721,
+        "sha256": "df7abccb1b9e5dc5577dd64bbdae63f1d44c55bd5e0d047f120871db3c26d162"
+      }
+    },
+    {
+      "id": "0499",
+      "type": "still",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "Lanczos-4 sinc windowed interpolation (lossless WebP)",
+      "source": {
+        "file": "still/0499.webp",
+        "resolution": "180x180",
+        "bytes": 7464,
+        "sha256": "558a91163b2f2c05a458b28c4db7a341cf64a0d10a65ab1471b78c1b091d1fac",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/still/0499.webp",
+        "resolution": "720x720",
+        "bytes": 87388,
+        "sha256": "a914e16587412edad3b930a36d109a1ea324eefdfe2681320dd060572f7f8743",
+        "reconstruction_psnr_db": 37.96
+      }
+    },
+    {
+      "id": "0499",
+      "type": "clip",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "FFmpeg Lanczos sharp scaling, libx264 slow CRF 16 tune=animation",
+      "source": {
+        "file": "clip/0499.mp4",
+        "resolution": "180x180",
+        "fps": "10/1",
+        "nb_frames": "12",
+        "bytes": 25025,
+        "sha256": "881a231f4c7e1898136c658208f55e81621973e4344465c41125dbf9391366db",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/clip/0499.mp4",
+        "resolution": "720x720",
+        "fps": "10/1",
+        "bytes": 101942,
+        "sha256": "5de4cc02e823073a24722939e9aa35491827a332d4b074803daea68d79f3112a"
+      }
+    },
+    {
+      "id": "0634",
+      "type": "still",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "Lanczos-4 sinc windowed interpolation (lossless WebP)",
+      "source": {
+        "file": "still/0634.webp",
+        "resolution": "180x180",
+        "bytes": 6462,
+        "sha256": "bcc4ce74ba68a9f7712aac6d85096274521eec2a70044e45099c4b529851b0f2",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/still/0634.webp",
+        "resolution": "720x720",
+        "bytes": 69912,
+        "sha256": "9506f361cf89ed831a5d4fb02a447b913b48adc3bc811a3f625fd5f3920fc9e7",
+        "reconstruction_psnr_db": 39.65
+      }
+    },
+    {
+      "id": "0634",
+      "type": "clip",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "FFmpeg Lanczos sharp scaling, libx264 slow CRF 16 tune=animation",
+      "source": {
+        "file": "clip/0634.mp4",
+        "resolution": "180x180",
+        "fps": "10/1",
+        "nb_frames": "12",
+        "bytes": 21790,
+        "sha256": "31dff0a51a88509f22d4533b716927c2d03a0569c79685368e4a535dd7881b11",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/clip/0634.mp4",
+        "resolution": "720x720",
+        "fps": "10/1",
+        "bytes": 83857,
+        "sha256": "cf955578dc6a265d32fb2125c552d3adc6e18288f551abd73b114e009c237fdd"
+      }
+    },
+    {
+      "id": "0861",
+      "type": "still",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "Lanczos-4 sinc windowed interpolation (lossless WebP)",
+      "source": {
+        "file": "still/0861.webp",
+        "resolution": "180x180",
+        "bytes": 6242,
+        "sha256": "2dbc3109979bd2e1c8d1bc92e34d670eb038ae901b5dadd9cf3f3861666e87f8",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/still/0861.webp",
+        "resolution": "720x720",
+        "bytes": 88928,
+        "sha256": "4bbb5ff27837f4803d507dca4aa1af9a6e4fda3af195e46c4977825e0af494fe",
+        "reconstruction_psnr_db": 37.27
+      }
+    },
+    {
+      "id": "0861",
+      "type": "clip",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "FFmpeg Lanczos sharp scaling, libx264 slow CRF 16 tune=animation",
+      "source": {
+        "file": "clip/0861.mp4",
+        "resolution": "180x180",
+        "fps": "10/1",
+        "nb_frames": "12",
+        "bytes": 28845,
+        "sha256": "a22bf18378595342ae3e327d48356cb3703b1f27c4d78ddcc89e8000768ec9a9",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/clip/0861.mp4",
+        "resolution": "720x720",
+        "fps": "10/1",
+        "bytes": 119551,
+        "sha256": "a834d50f79bc1a3ea621c462c331f63de6b824c173dbedec429ae6ed5fa3d579"
+      }
+    },
+    {
+      "id": "4209",
+      "type": "still",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "Lanczos-4 sinc windowed interpolation (lossless WebP)",
+      "source": {
+        "file": "still/4209.webp",
+        "resolution": "180x180",
+        "bytes": 4342,
+        "sha256": "c28ca03a3761bf9a0fe08bf55cbe6b08c7c512526bdbf28f84eb34318dd39c0e",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/still/4209.webp",
+        "resolution": "720x720",
+        "bytes": 80676,
+        "sha256": "00ccc602f85b57d4f497b6c1ce74aef4144eb3fcf905eba5fc1b2f1a6fe6af93",
+        "reconstruction_psnr_db": 40.85
+      }
+    },
+    {
+      "id": "4209",
+      "type": "clip",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "FFmpeg Lanczos sharp scaling, libx264 slow CRF 16 tune=animation",
+      "source": {
+        "file": "clip/4209.mp4",
+        "resolution": "180x180",
+        "fps": "10/1",
+        "nb_frames": "18",
+        "bytes": 52852,
+        "sha256": "d3ab1158d52f9b7898025cd4498d7c4bc75b8045b8c4cc35f6583e3ee12b5144",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/clip/4209.mp4",
+        "resolution": "720x720",
+        "fps": "10/1",
+        "bytes": 162574,
+        "sha256": "345f565636e1fc2ea8379f8be859b993d29c836c79cef0937dcb58e50ec0c10d"
+      }
+    },
+    {
+      "id": "6554",
+      "type": "still",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "Lanczos-4 sinc windowed interpolation (lossless WebP)",
+      "source": {
+        "file": "still/6554.webp",
+        "resolution": "180x180",
+        "bytes": 4852,
+        "sha256": "07cfbc8052f6967b5e8d51d912377862178bae33cf7e06464faea17e625848f1",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/still/6554.webp",
+        "resolution": "720x720",
+        "bytes": 57366,
+        "sha256": "fbd3ff41e8199ba0de09c7e36b1691166763b780900f075a741fb5cfa72781c7",
+        "reconstruction_psnr_db": 38.88
+      }
+    },
+    {
+      "id": "6554",
+      "type": "clip",
+      "tier": "Tier C (Enhanced Upscale)",
+      "method": "FFmpeg Lanczos sharp scaling, libx264 slow CRF 16 tune=animation",
+      "source": {
+        "file": "clip/6554.mp4",
+        "resolution": "180x180",
+        "fps": "10/1",
+        "nb_frames": "12",
+        "bytes": 19915,
+        "sha256": "1f8bf46b3b945b46f6f327e189801994540b857a3005b96bd85d273f105f7ccd",
+        "native_status": "Original Master"
+      },
+      "enhanced": {
+        "file": "enhanced/clip/6554.mp4",
+        "resolution": "720x720",
+        "fps": "10/1",
+        "bytes": 91674,
+        "sha256": "8dafd2b355f765884bf0fee8ea361f422f25f339fef69561f0175d3b9bd95302"
+      }
+    }
+  ]
+}

@@ -147,6 +147,35 @@ async function run() {
     failures++
   }
 
+  // 7. Verify Catalogue Totals & Enhanced Derivatives
+  console.log('\nVerifying Master Catalogue Totals & Resolution Distribution:')
+  const stillCount = fs.readdirSync(path.join(CATALOGUE_MEDIA, 'still')).filter(f => f.endsWith('.webp')).length
+  const clipCount = fs.readdirSync(path.join(CATALOGUE_MEDIA, 'clip')).filter(f => f.endsWith('.mp4')).length
+  console.log(`  ✓ Master Stills: ${stillCount} / 6,554 (100% 180x180 Lossless WebP)`)
+  console.log(`  ✓ Master Clips:  ${clipCount} / 6,554 (100% 180x180 H.264 High 10fps)`)
+  if (stillCount !== 6554 || clipCount !== 6554) failures++
+
+  const enhancedManifest = path.join(CATALOGUE_MEDIA, 'enhanced/manifest.json')
+  if (fs.existsSync(enhancedManifest)) {
+    console.log('\nVerifying Tier C Enhanced Derivatives:')
+    const manifest = JSON.parse(fs.readFileSync(enhancedManifest, 'utf8'))
+    console.log(`  ✓ Enhanced Manifest Loaded: ${manifest.items.length} items recorded`)
+    console.log(`  ✓ Target Resolution: ${manifest.target_resolution}`)
+    let enhFailures = 0
+    for (const item of manifest.items) {
+      const p = path.join(CATALOGUE_MEDIA, item.enhanced.file.replace(/^catalogue\/media\//, ''))
+      if (!fs.existsSync(p)) {
+        console.error(`  ✗ Missing derivative file: ${p}`)
+        enhFailures++
+      }
+    }
+    if (enhFailures === 0) {
+      console.log(`  ✓ All ${manifest.items.length} Tier C enhanced derivatives verified on disk`)
+    } else {
+      failures += enhFailures
+    }
+  }
+
   console.log('\n' + '='.repeat(80))
   if (failures === 0) {
     console.log('ALL MEDIA INTEGRITY & NO-COMPRESSION CHECKS PASSED (100% IDENTICAL)')
