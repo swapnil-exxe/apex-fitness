@@ -38,7 +38,7 @@
    - **Storage & Packaging**: Retained original 180×180 masters in the 214 MB Android APK to preserve instant zero-latency offline access without inflating the APK to an unmanageable 16–32 GB.
 
 5. **Android Application Package (100% BUILT & DELIVERED)**:
-   - Fresh, fully bundled Android release APK compiled and delivered at `/Users/swapnil/Documents/APEX-clean/release/APEX-Fitness-Android.apk` (**214 MB**, 224,793,318 bytes, build timestamp `2026-10-21 11:54:30`, SHA-256: `051228b40746fb9cf583b9651a07dd285d673c80416ae015b257d01217761059`).
+   - Fresh, fully bundled Android release APK compiled with standalone mobile flavor and delivered at `/Users/swapnil/Documents/APEX-clean/release/APEX-Fitness-Android.apk` (**214 MB**, 224,789,222 bytes, build timestamp `2026-10-21 14:06:03`, SHA-256: `4cef1bad5f4f22c0b8f7f0fec0b5eaf99d834478e11a3dfd65a41f3300681d89`).
    - Application ID verified as exactly **`com.apex.fitness`**. Application label verified as **`APEX`**.
    - Inlines the verified production Render backend URL (`https://apex-fitness-fd32.onrender.com`).
    - Bundles all 6,554 stills and 6,554 animation clips for **100% offline media functionality** with zero grey dumbbell placeholders.
@@ -307,9 +307,9 @@ The live integration probe verified the complete multi-device data pipeline agai
   ```text
   /Users/swapnil/Documents/APEX-clean/frontend/android/app/build/outputs/apk/release/app-release-signed.apk
   ```
-* **File Size**: **214 MB (224,793,318 bytes)**
-* **Build Timestamp**: `2026-10-21 11:54:30`
-* **SHA-256 Checksum**: `051228b40746fb9cf583b9651a07dd285d673c80416ae015b257d01217761059`
+* **File Size**: **214 MB (224,789,222 bytes)**
+* **Build Timestamp**: `2026-10-21 14:06:03`
+* **SHA-256 Checksum**: `4cef1bad5f4f22c0b8f7f0fec0b5eaf99d834478e11a3dfd65a41f3300681d89`
 * **File Existence & Integrity**: **CONFIRMED** (`unzip -t` and `apksigner verify` passed with 0 errors).
 * **Build Type**: Android Release APK (`assembleRelease`).
 * **Application ID**: **`com.apex.fitness`** (versionCode `26`, versionName `1.4.1`).
