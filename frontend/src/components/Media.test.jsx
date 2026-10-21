@@ -72,6 +72,23 @@ describe('Media gifSize', () => {
     expect(host.querySelector('.exmedia img')).toBeTruthy()
     expect(host.querySelector('.exmedia.mini')).toBeFalsy()
   })
+
+  it('attempts enhanced derivative for verified exercise and falls back cleanly on error', () => {
+    const ex0001 = { id: '0001', n: 'barbell bench press', gif: '0001.mp4', img: '0001.webp' }
+    act(() => root.render(<Media ex={ex0001} />))
+    const video = host.querySelector('.exmedia video')
+    expect(video).toBeTruthy()
+    expect(video.getAttribute('src')).toBe('exercise-media/enhanced/clip/0001.mp4')
+
+    // Simulate error loading enhanced video
+    act(() => { video.dispatchEvent(new Event('error')) })
+
+    // Must cleanly fall back to original master without showing dumbbell broken tile
+    expect(host.querySelector('.exmedia.broken')).toBeFalsy()
+    const fallbackVideo = host.querySelector('.exmedia video')
+    expect(fallbackVideo).toBeTruthy()
+    expect(fallbackVideo.getAttribute('src')).toBe('exercise-media/clip/0001.mp4')
+  })
 })
 
 /* ---------------------------------------------------------------- custom exercises -------- */

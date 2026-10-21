@@ -38,4 +38,22 @@ const dest = path.join(out, 'exercise-media')
 const stills = copyDir(path.join(media, 'still'), path.join(dest, 'still'), '.webp')
 const clips = copyDir(appDir || path.join(media, 'clip'), path.join(dest, 'clip'), clipExt)
 fs.copyFileSync(path.join(media, 'NOTICE.md'), path.join(dest, 'NOTICE.md'))
-console.log(`media: ${stills} stills, ${clips} animations${appDir ? ' (app size)' : ''} -> ${path.relative(ROOT, out) || out}`)
+
+let enhStills = 0
+let enhClips = 0
+const enhDir = path.join(media, 'enhanced')
+if (fs.existsSync(enhDir)) {
+  if (fs.existsSync(path.join(enhDir, 'still'))) {
+    enhStills = copyDir(path.join(enhDir, 'still'), path.join(dest, 'enhanced/still'), '.webp')
+  }
+  if (fs.existsSync(path.join(enhDir, 'clip'))) {
+    enhClips = copyDir(path.join(enhDir, 'clip'), path.join(dest, 'enhanced/clip'), '.mp4')
+  }
+  if (fs.existsSync(path.join(enhDir, 'manifest.json'))) {
+    fs.mkdirSync(path.join(dest, 'enhanced'), { recursive: true })
+    fs.copyFileSync(path.join(enhDir, 'manifest.json'), path.join(dest, 'enhanced/manifest.json'))
+  }
+}
+
+const enhNote = enhStills > 0 ? ` (+ ${enhStills} enhanced derivatives)` : ''
+console.log(`media: ${stills} stills, ${clips} animations${appDir ? ' (app size)' : ''}${enhNote} -> ${path.relative(ROOT, out) || out}`)

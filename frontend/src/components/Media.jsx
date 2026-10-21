@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { imgSrc, gifSrc, isVideoSrc, isCustomEx, figureOf } from '../lib/exercises.js'
+import { imgSrc, gifSrc, isVideoSrc, isCustomEx, figureOf, hasEnhancedDerivative, enhancedImgSrc, enhancedGifSrc } from '../lib/exercises.js'
 import { MOBILE } from '../lib/mobile.js'
 import { useStore } from '../store/useStore.js'
 import { t, exerciseNameFor } from '../lib/i18n.js'
@@ -28,19 +28,44 @@ function BuiltinMedia({ ex, id, compact, minimizable }) {
   // on a white block. Now the still stands in for the animation, a neutral tile stands in for
   // both, and a tap tries again — no text, so nothing new to translate.
   const [failed, setFailed] = useState(null)
+  const [enhancedFailed, setEnhancedFailed] = useState(false)
   const gifSize = useStore(s => s.S.gifSize)
   const body = useStore(s => figureOf(s.S))
   const update = useStore(s => s.update)
-  const clip = ex.gif && isVideoSrc(gifSrc(ex, body)) ? gifSrc(ex, body) : null
+
+  // Quality resolution with 100% reliable original fallback:
+  // If a verified enhanced derivative exists and has not failed, attempt it.
+  // Otherwise, use the immutable original master files.
+  const hasEnh = hasEnhancedDerivative(ex) && !enhancedFailed
+  const origClip = ex.gif && isVideoSrc(gifSrc(ex, body)) ? gifSrc(ex, body) : null
+  const enhClip = hasEnh && isVideoSrc(enhancedGifSrc(ex, body)) ? enhancedGifSrc(ex, body) : null
+  const clip = enhClip || origClip
   const clipSrc = useClipInMemory(clip)
+
+  const origStill = imgSrc(ex, body)
+  const enhStill = hasEnh ? enhancedImgSrc(ex, body) : null
+  const stillSrc = enhStill || origStill
+
+  const origGif = gifSrc(ex, body)
+  const enhGif = hasEnh ? enhancedGifSrc(ex, body) : null
+  const animSrc = enhGif || origGif
+
   if (!ex.gif) return null
   if (minimizable && gifSize === 'off') return null
   const mini = minimizable && gifSize === 'mini'
   const toggleSize = e => { e.stopPropagation(); update(s => { s.gifSize = mini ? 'full' : 'mini' }) }
   const showGif = playing && failed == null
-  const onError = () => setFailed(showGif ? 'gif' : 'all')
+  const onError = () => {
+    // If attempting an enhanced derivative and it fails (e.g. 404 or missing on device),
+    // immediately fall back to the original master source without showing placeholder!
+    if (hasEnh) {
+      setEnhancedFailed(true)
+      return
+    }
+    setFailed(showGif ? 'gif' : 'all')
+  }
   const onTap = () => {
-    if (failed) { setFailed(null); setPlaying(true); return }
+    if (failed) { setFailed(null); setEnhancedFailed(false); setPlaying(true); return }
     setPlaying(p => !p)
   }
   return (
@@ -54,8 +79,8 @@ function BuiltinMedia({ ex, id, compact, minimizable }) {
               aria-label={exerciseNameFor(ex)} onError={onError} />
           : showGif && clip
             // the phone app is still reading the clip into memory: the still holds its place
-            ? <img decoding="async" draggable={false} src={imgSrc(ex, body)} alt={exerciseNameFor(ex)} />
-          : <img decoding="async" draggable={false} src={showGif ? gifSrc(ex, body) : imgSrc(ex, body)} alt={exerciseNameFor(ex)} onError={onError} />}
+            ? <img decoding="async" draggable={false} src={stillSrc} alt={exerciseNameFor(ex)} />
+          : <img decoding="async" draggable={false} src={showGif ? animSrc : stillSrc} alt={exerciseNameFor(ex)} onError={onError} />}
       {minimizable && (
         <button className="giftoggle" onClick={toggleSize}>
           <Icon name={mini ? 'expand' : 'minimize'} />{mini ? t('Expand') : t('Minimize')}

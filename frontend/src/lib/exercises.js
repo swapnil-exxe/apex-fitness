@@ -197,6 +197,26 @@ const drawing = (ex, figure) => (figure === 'female' ? ex.fv : figure === 'male'
 export const imgSrc = (ex, figure) => IMG_BASE + (drawing(ex, figure) ? drawing(ex, figure) + '.webp' : ex.img)
 const clipFile = f => (CLIP_EXT !== '.mp4' && f.endsWith('.mp4') ? f.slice(0, -4) + CLIP_EXT : f)
 export const gifSrc = (ex, figure) => GIF_BASE + clipFile(drawing(ex, figure) ? drawing(ex, figure) + '.mp4' : ex.gif)
+
+// Verified exercises that have Tier C Enhanced Derivatives (720x720) available
+export const ENHANCED_EXERCISE_IDS = new Set([
+  '0001', '0002', '0007', '0027', '0032', '0043',
+  '0293', '0499', '0634', '0861', '4209', '6554'
+])
+export const hasEnhancedDerivative = ex => !!ex && ENHANCED_EXERCISE_IDS.has(String(ex.id || ''))
+
+const ENHANCED_IMG_BASE = ENV.VITE_ENHANCED_IMG_BASE || 'exercise-media/enhanced/still/'
+const ENHANCED_GIF_BASE = ENV.VITE_ENHANCED_GIF_BASE || 'exercise-media/enhanced/clip/'
+
+export const enhancedImgSrc = (ex, figure) => {
+  if (!hasEnhancedDerivative(ex)) return null
+  return ENHANCED_IMG_BASE + (drawing(ex, figure) ? drawing(ex, figure) + '.webp' : ex.img)
+}
+
+export const enhancedGifSrc = (ex, figure) => {
+  if (!hasEnhancedDerivative(ex)) return null
+  return ENHANCED_GIF_BASE + clipFile(drawing(ex, figure) ? drawing(ex, figure) + '.mp4' : ex.gif)
+}
 // The catalogue's animations are short MP4 loops; a fork's or an older build's may still be GIFs.
 export const isVideoSrc = src => /\.(mp4|webm)(\?|$)/i.test(src || '')
 

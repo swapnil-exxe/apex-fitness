@@ -519,7 +519,7 @@ h4.sec{
   .routine-grip:hover{color:var(--label-2)}
 }
 .routine-list.is-reordering,.routine-list.is-reordering *{cursor:grabbing}
-.thumb{width:50px;height:50px;border-radius:9px;object-fit:cover;background:#fff;flex:none;image-rendering:-webkit-optimize-contrast}
+.thumb{width:50px;height:50px;border-radius:9px;object-fit:cover;background:#fff;flex:none}
 /* exercise pictures are decoration inside tappable rows/cards: no save-image callout on
    a long press and no drag ghost when a scroll starts on the picture */
 .thumb,.exmedia img,.exmedia video{-webkit-touch-callout:none;-webkit-user-drag:none;user-select:none;-webkit-user-select:none}
@@ -885,7 +885,7 @@ body.chips-dragging *{cursor:inherit}
 .wprog{height:4px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin-bottom:16px}
 .wprog i{display:block;height:100%;background:var(--acc);border-radius:99px;transition:width var(--med) var(--ease)}
 .exmedia{position:relative;border-radius:var(--r-lg);overflow:hidden;background:#fff;margin-bottom:12px}
-.exmedia img{width:100%;height:320px;object-fit:contain;display:block;image-rendering:-webkit-optimize-contrast}
+.exmedia img{width:100%;height:320px;object-fit:contain;display:block}
 .exmedia .gifhint,.exmedia .giftoggle{
   position:absolute;bottom:9px;display:inline-flex;align-items:center;gap:4px;
   background:rgba(0,0,0,.45);color:#fff;border-radius:99px;padding:5px 11px;
@@ -907,7 +907,7 @@ body.chips-dragging *{cursor:inherit}
 .exmedia.mini .exmedia-x{height:84px}
 /* a custom exercise's own video (components/CustomMedia.jsx): the same box as a picture, on black
    so a clip that does not fill it is letterboxed like any player */
-.exmedia video{width:100%;height:320px;object-fit:contain;display:block;background:#000;image-rendering:-webkit-optimize-contrast}
+.exmedia video{width:100%;height:320px;object-fit:contain;display:block;background:#000}
 .exmedia.compact video{height:120px}
 .exmedia.mini video{height:84px}
 .exmedia:has(> video){background:#000}
