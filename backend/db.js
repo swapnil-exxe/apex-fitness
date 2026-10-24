@@ -395,7 +395,8 @@ export const dbService = {
     // 3. Ingest Bodyweight logs
     if (Array.isArray(doc.bodyweight)) {
       for (const b of doc.bodyweight) {
-        if (!b || !b.id) continue;
+        if (!b) continue;
+        const bId = b.id || `bw_${b.d || Date.now()}`;
         const wt = Number(b.w || b.weight || 0);
         await query(`
           INSERT INTO bodyweight_logs (id, user_id, date, weight, unit)
@@ -404,7 +405,7 @@ export const dbService = {
             date = EXCLUDED.date,
             weight = EXCLUDED.weight,
             unit = EXCLUDED.unit
-        `, [b.id, userId, b.d || b.date, wt, b.unit || 'kg']);
+        `, [bId, userId, b.d || b.date, wt, b.unit || 'kg']);
       }
     }
   },

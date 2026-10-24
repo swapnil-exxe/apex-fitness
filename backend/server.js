@@ -2116,7 +2116,40 @@ const googleAuthRoutes = {
     }
 
     if (existingUser) {
-      // Security rule: NEVER automatically merge accounts without re-auth proof
+      if (claims.emailVerified) {
+        let fedId = (db.federatedIdentities || []).find(f => f.provider === 'google' && f.providerSubject === claims.sub);
+        if (!fedId) {
+          fedId = {
+            id: crypto.randomBytes(12).toString('base64url'),
+            userId: existingUser.id,
+            provider: 'google',
+            providerSubject: claims.sub,
+            email: claims.email,
+            emailVerified: true,
+            created: Date.now(),
+            lastLogin: Date.now()
+          };
+          db.federatedIdentities = db.federatedIdentities || [];
+          db.federatedIdentities.push(fedId);
+          saveDb();
+          if (process.env.DATABASE_URL) {
+            try {
+              await dbService.addFederatedIdentity(fedId);
+            } catch (e) {
+              console.error('[PostgreSQL] Fed identity add error:', e.message);
+            }
+          }
+        }
+        audit(req, 'auth.login.ok', { user: existingUser, msg: 'google-auto-linked' });
+        if (isMobile) {
+          const token = makeSession(existingUser);
+          const deepLinkUrl = `com.apex.fitness://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(existingUser)))}`;
+          return sendMobileAuthResponse(res, deepLinkUrl, clearStateCookie, existingUser);
+        }
+        return redirect(res, `${frontendUrl}/#auth-success`, { 'Set-Cookie': [...sessionCookie(existingUser), clearStateCookie] });
+      }
+
+      // If email is not verified by Google, require proof
       const linkingToken = signLinkingChallenge({
         userId: existingUser.id,
         email: claims.email,
