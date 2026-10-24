@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>APEX Fitness: Privacy Policy</title>
+<meta name="description" content="APEX Fitness Privacy Policy. Learn how we handle your data, Google OAuth authentication, and cloud synchronization.">
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="index,follow">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="styles.css?v=26">
+<style>
+  .policy-body { max-width: 800px; margin: 40px auto 80px; padding: 0 20px; line-height: 1.7; color: #ddd; }
+  .policy-body h1 { font-size: 2.2rem; color: #fff; margin-bottom: 8px; }
+  .policy-body h2 { font-size: 1.4rem; color: #fff; margin-top: 36px; margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  .policy-body p, .policy-body ul { margin-bottom: 16px; font-size: 1rem; }
+  .policy-body ul { padding-left: 24px; }
+  .policy-body li { margin-bottom: 8px; }
+  .policy-body .updated { color: #888; font-size: 0.9rem; margin-bottom: 30px; }
+  .highlight-card { background: rgba(255,255,255,0.04); border: 1px solid #333; border-radius: 8px; padding: 18px 24px; margin: 24px 0; }
+  .highlight-card strong { color: #fff; }
+</style>
+</head>
+<body class="topnav">
+<nav><div class="wrap nav-in">
+  <a class="brand" href="/">
+    <img src="icon-180.png" alt="" width="24" height="24">
+    APEX Fitness
+  </a>
+  <div class="nav-quick">
+    <a class="ql site" href="/#features">Features</a>
+    <a class="ql site" href="/#screens">Screenshots</a>
+    <a class="ql site" href="/docs.html">Docs</a>
+    <a class="ql site" href="/about.html">About</a>
+    <a class="ql" href="https://github.com/swapnil-exxe/apex-fitness" rel="noopener">GitHub</a>
+  </div>
+</div></nav>
+
+<main class="policy-body">
+  <h1>Privacy Policy</h1>
+  <div class="updated">Last updated: October 25, 2026</div>
+
+  <div class="highlight-card">
+    <strong>Privacy First Principle:</strong> APEX Fitness is designed around personal data ownership. You control your workout history, body measurements, and profile. We never sell your personal data, never share it with advertisers, and never train AI models on your private workouts.
+  </div>
+
+  <h2>1. Overview</h2>
+  <p>APEX Fitness ("we", "our", or "the App") is an offline-capable fitness tracking application available across Android, iOS, and modern web browsers. This Privacy Policy describes how information is collected, used, and protected when you use our mobile applications and cloud services.</p>
+
+  <h2>2. Google Account Authentication (OAuth 2.0)</h2>
+  <p>APEX Fitness offers Google Sign-In as a seamless, secure authentication method to synchronize your workout history across multiple devices.</p>
+  <ul>
+    <li><strong>Information Requested:</strong> When you sign in with Google, we request access solely to your basic profile information (Google User ID, email address, display name, and avatar URL) via the standard <code>openid email profile</code> scopes.</li>
+    <li><strong>Limited Use:</strong> We use your Google profile information exclusively to create and identify your APEX account, verify your identity, and enable secure multi-device synchronization.</li>
+    <li><strong>No Broader Access:</strong> We do not request, access, or store your Google contacts, Google Drive files, calendar events, search history, or device location.</li>
+    <li><strong>No Commercial Sharing:</strong> Your Google account details are never sold, rented, or shared with third-party data brokers or marketing platforms.</li>
+  </ul>
+
+  <h2>3. Workout and Fitness Data Storage</h2>
+  <p>When you use APEX Fitness with cloud synchronization enabled, your fitness data is securely stored in our managed Supabase PostgreSQL database:</p>
+  <ul>
+    <li><strong>What is stored:</strong> Workout sessions, sets, reps, load, RPE/RIR notes, routine templates, body weight logs, and personal preferences (such as KG/LBS unit settings).</li>
+    <li><strong>Multi-Device Sync:</strong> Your data synchronizes seamlessly between your authorized Android devices and web sessions so you never lose your training history.</li>
+    <li><strong>Security:</strong> All network communication between the App and our backend servers (<code>https://apex-fitness-fd32.onrender.com</code>) is encrypted using Transport Layer Security (TLS 1.3). Database access is protected by strict authentication controls and authenticated session tokens.</li>
+  </ul>
+
+  <h2>4. Offline & Guest Mode</h2>
+  <p>You may use APEX Fitness entirely offline without creating an account or signing in with Google. In guest/offline mode:</p>
+  <ul>
+    <li>All workout data, routines, and measurements are stored exclusively on your device's local storage (IndexedDB / SQLite).</li>
+    <li>No data is transmitted to APEX servers or any third party.</li>
+    <li>You may choose to migrate local data into a Google account at any time.</li>
+  </ul>
+
+  <h2>5. Data Retention, Export & Deletion</h2>
+  <p>You retain full ownership of your fitness data:</p>
+  <ul>
+    <li><strong>Data Export:</strong> You can export a complete JSON backup of your entire workout history, custom exercises, routines, and logs at any time from <em>Settings &rarr; Data &rarr; Export</em>.</li>
+    <li><strong>Account and Data Deletion:</strong> You can permanently delete your entire account and all cloud-stored workout records by choosing <em>Settings &rarr; Data &rarr; Reset Everything</em>. Deletion requests take effect immediately and remove your data from active cloud databases.</li>
+  </ul>
+
+  <h2>6. Third-Party Services</h2>
+  <p>APEX Fitness integrates with the following trusted infrastructure providers to deliver its services:</p>
+  <ul>
+    <li><strong>Google Identity Services:</strong> For secure OAuth 2.0 sign-in.</li>
+    <li><strong>Supabase:</strong> For hosted PostgreSQL database persistence.</li>
+    <li><strong>Render:</strong> For backend API server execution.</li>
+    <li><strong>Vercel:</strong> For web application hosting.</li>
+  </ul>
+
+  <h2>7. Changes to this Policy</h2>
+  <p>We may update this Privacy Policy from time to time. Any changes will be posted on this page with an updated revision date.</p>
+
+  <h2>8. Contact Us</h2>
+  <p>If you have any questions, feedback, or data privacy requests regarding APEX Fitness, please contact us via our GitHub repository at <a href="https://github.com/swapnil-exxe/apex-fitness" style="color:var(--acc,#00d26a);text-decoration:underline;">https://github.com/swapnil-exxe/apex-fitness</a> or via email at <code>support@apexfitness.app</code>.</p>
+</main>
+</body>
+</html>

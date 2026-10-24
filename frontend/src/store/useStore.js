@@ -1361,9 +1361,10 @@ export const useStore = create((set, get) => {
     // still logging in the old unit meets it on its very next push, and a copy it pushed first is
     // converted before it is merged in.
     setUnit(to, { convert = true } = {}) {
+      const target = to === 'lbs' ? 'lb' : to
       const S0 = get().S
-      if ((S0.unit || 'kg') === to) return null
-      const S = clone(convert ? convertStateUnit(S0, to) : { ...S0, unit: to })
+      if ((S0.unit || 'kg') === target) return null
+      const S = clone(convert ? convertStateUnit(S0, target) : { ...S0, unit: target })
       S.unitSet = { at: Math.max(Date.now(), highestStamp(S0) + 1), convert }
       persist(S, true)
       return convert && get().ready ? get().pushState() : null

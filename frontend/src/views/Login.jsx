@@ -78,6 +78,7 @@ export default function Login() {
   const canGuest = guestAllowed(config)
   const pwOn = passwordOn(config)
   const googleOn = config?.google_auth !== false && Boolean(config?.google_auth || import.meta.env.VITE_GOOGLE_AUTH === '1')
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   useEffect(() => {
     handleAuthUrlHash()
@@ -112,44 +113,88 @@ export default function Login() {
   return (
     <div className="narrow" style={wrap}>
       {head}
-      <div className="muted" style={{ marginBottom: 34 }}>{t('Your workouts. Your weights. Your profile.')}</div>
-      {googleOn && <>
-        <GoogleSignInButton onClick={() => initiateGoogleSignIn()} />
-        <div style={{ height: 10 }} />
-      </>}
-      {webauthnOK() ? <>
-        <Button variant="primary" icon="fingerprint" onClick={signIn}>{t('Sign in with passkey')}</Button>
-        <div style={{ height: 10 }} />
-        {pwOn && <><Button icon="key" onClick={() => openPasswordSignIn()}>{t('Sign in with password')}</Button><div style={{ height: 10 }} /></>}
-        <Button icon="plusCircle" onClick={register}>{t('Create new profile')}</Button>
-        {/* Already signed in on another device: a code from there gives this one a passkey of
-            its own (#95), instead of a new, empty profile. */}
-        <div style={{ height: 10 }} />
-        <Button variant="ghost" className="dim" icon="qr" onClick={openDeviceLinkRedeem}>{t('Use a code from your other device')}</Button>
-        {canGuest && <div style={{ height: 4 }} />}
-      </> : pwOn ? <>
-        {/* Plain http on a LAN address, or a browser without passkey support: the password is
-            the way in, and the only way to create a profile from here. */}
-        <div className="card small muted" style={{ textAlign: 'start', marginBottom: 14 }}>{t("This browser doesn't support passkeys. Sign in with your name and password instead.")}</div>
-        <Button variant="primary" icon="key" onClick={() => openPasswordSignIn()}>{t('Sign in with password')}</Button>
-        <div style={{ height: 10 }} />
-        <Button icon="plusCircle" onClick={register}>{t('Create new profile')}</Button>
-        {canGuest && <div style={{ height: 10 }} />}
-      </> : <div className="card small muted" style={{ textAlign: 'start' }}>{canGuest
-        ? t("This browser doesn't do passkeys, but you can still use APEX locally on this device.")
-        // Without passkeys and without the guest entrance there is no way in from this browser,
-        // so say that plainly instead of offering a local profile that cannot be created.
-        : t("This browser doesn't support passkeys, and this instance requires an account. Try a browser or device with passkey support.")}</div>}
-      {canGuest && <Button variant="ghost" className="dim" onClick={async () => {
-        if (MOBILE) {
-          try {
-            const { chooseLocal } = await import('../lib/remote.js')
-            await chooseLocal()
-          } catch {}
-        }
-        setGuest(true)
-      }}>{t('Continue without account')}</Button>}
-      <div className="dim small" style={{ marginTop: 26, lineHeight: 1.5 }}>{pwOn ? t('Passkeys use {0}. A password works too, where passkeys do not.', bio()) : t('Passkeys use {0}. No passwords to remember.', bio())}<br />{t('Each profile keeps its own plan, workouts & body weight.')}</div>
+      <div className="muted" style={{ marginBottom: 30 }}>{t('Your workouts. Your weights. Your profile.')}</div>
+      {googleOn ? (
+        <div style={{ maxWidth: 360, margin: '0 auto', width: '100%' }}>
+          <GoogleSignInButton onClick={() => initiateGoogleSignIn()} />
+          <div style={{ height: 16 }} />
+          <div className="dim small" style={{ margin: '8px 0 20px', lineHeight: 1.5 }}>
+            {t('Sign in with Google to sync your fitness data across your devices with APEX Cloud.')}
+            <div style={{ marginTop: 8 }}>
+              <a href="/privacy.html" target="_blank" rel="noopener" style={{ color: 'var(--acc)', textDecoration: 'underline' }}>
+                {t('Privacy Policy & Terms')}
+              </a>
+            </div>
+          </div>
+          {canGuest && (
+            <Button variant="ghost" className="dim" onClick={async () => {
+              if (MOBILE) {
+                try {
+                  const { chooseLocal } = await import('../lib/remote.js')
+                  await chooseLocal()
+                } catch {}
+              }
+              setGuest(true)
+            }}>{t('Continue without account (offline)')}</Button>
+          )}
+          <div style={{ marginTop: 20 }}>
+            {showAdvanced ? (
+              <div className="card small" style={{ textAlign: 'start', marginTop: 12 }}>
+                <div className="muted small" style={{ marginBottom: 8 }}>{t('Legacy & self-hosted sign-in options:')}</div>
+                {webauthnOK() && <Button size="sm" icon="fingerprint" onClick={signIn}>{t('Sign in with passkey')}</Button>}
+                {pwOn && <><div style={{ height: 6 }} /><Button size="sm" icon="key" onClick={() => openPasswordSignIn()}>{t('Sign in with password')}</Button></>}
+                <div style={{ height: 6 }} /><Button size="sm" icon="plusCircle" onClick={register}>{t('Create new profile')}</Button>
+                {webauthnOK() && <><div style={{ height: 6 }} /><Button size="sm" variant="ghost" className="dim" icon="qr" onClick={openDeviceLinkRedeem}>{t('Use a code from your other device')}</Button></>}
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="dim smallest link"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6 }}
+                onClick={() => setShowAdvanced(true)}
+              >
+                {t('Advanced options')}
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {webauthnOK() ? <>
+            <Button variant="primary" icon="fingerprint" onClick={signIn}>{t('Sign in with passkey')}</Button>
+            <div style={{ height: 10 }} />
+            {pwOn && <><Button icon="key" onClick={() => openPasswordSignIn()}>{t('Sign in with password')}</Button><div style={{ height: 10 }} /></>}
+            <Button icon="plusCircle" onClick={register}>{t('Create new profile')}</Button>
+            {/* Already signed in on another device: a code from there gives this one a passkey of
+                its own (#95), instead of a new, empty profile. */}
+            <div style={{ height: 10 }} />
+            <Button variant="ghost" className="dim" icon="qr" onClick={openDeviceLinkRedeem}>{t('Use a code from your other device')}</Button>
+            {canGuest && <div style={{ height: 4 }} />}
+          </> : pwOn ? <>
+            {/* Plain http on a LAN address, or a browser without passkey support: the password is
+                the way in, and the only way to create a profile from here. */}
+            <div className="card small muted" style={{ textAlign: 'start', marginBottom: 14 }}>{t("This browser doesn't support passkeys. Sign in with your name and password instead.")}</div>
+            <Button variant="primary" icon="key" onClick={() => openPasswordSignIn()}>{t('Sign in with password')}</Button>
+            <div style={{ height: 10 }} />
+            <Button icon="plusCircle" onClick={register}>{t('Create new profile')}</Button>
+            {canGuest && <div style={{ height: 10 }} />}
+          </> : <div className="card small muted" style={{ textAlign: 'start' }}>{canGuest
+            ? t("This browser doesn't do passkeys, but you can still use APEX locally on this device.")
+            // Without passkeys and without the guest entrance there is no way in from this browser,
+            // so say that plainly instead of offering a local profile that cannot be created.
+            : t("This browser doesn't support passkeys, and this instance requires an account. Try a browser or device with passkey support.")}</div>}
+          {canGuest && <Button variant="ghost" className="dim" onClick={async () => {
+            if (MOBILE) {
+              try {
+                const { chooseLocal } = await import('../lib/remote.js')
+                await chooseLocal()
+              } catch {}
+            }
+            setGuest(true)
+          }}>{t('Continue without account')}</Button>}
+          <div className="dim small" style={{ marginTop: 26, lineHeight: 1.5 }}>{pwOn ? t('Passkeys use {0}. A password works too, where passkeys do not.', bio()) : t('Passkeys use {0}. No passwords to remember.', bio())}<br />{t('Each profile keeps its own plan, workouts & body weight.')}</div>
+        </>
+      )}
     </div>
   )
 }

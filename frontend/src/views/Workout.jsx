@@ -686,6 +686,27 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
     </button>}
     </>}
     <div className="card" style={{ marginTop: 10, marginBottom: 0 }}>
+      {(col1.f === 'w' || col2?.f === 'w') && <div className="workout-set-unit-bar">
+        <span className="unit-label">{t('Unit')}</span>
+        <div className="workout-unit-toggle" role="group" aria-label={t('Weight unit')}>
+          <button
+            type="button"
+            className={'unit-btn' + ((S.unit || 'kg') === 'kg' ? ' active' : '')}
+            onClick={() => useStore.getState().setUnit('kg', { convert: true })}
+            aria-pressed={(S.unit || 'kg') === 'kg'}
+          >
+            KG
+          </button>
+          <button
+            type="button"
+            className={'unit-btn' + (((S.unit || 'kg') === 'lb' || (S.unit || 'kg') === 'lbs') ? ' active' : '')}
+            onClick={() => useStore.getState().setUnit('lb', { convert: true })}
+            aria-pressed={((S.unit || 'kg') === 'lb' || (S.unit || 'kg') === 'lbs')}
+          >
+            LBS
+          </button>
+        </div>
+      </div>}
       {/* the header carries the same eff3/timed sizing as the rows, or the labels drift off their
           columns; over L/R rows it also has to skip the side badge that sits in front of the weight cell */}
       <div className={'sethead' + (col3 ? ' eff3' : '') + (timed ? ' timed' : '') + (perSide ? ' per-side' : '') + (wc.steppers ? '' : ' plain')}><span className="n-sp" /><span className="w-sp">{col1.hd}</span>{col2 && <span className="r-sp">{col2.hd}</span>}{col3 && <span className={col3.eff ? 'eff-sp' : 'r-sp'}>{col3.hd}</span>}{timed && <span className="ck-sp" />}<span className="ck-sp" /></div>
@@ -1916,6 +1937,26 @@ function ActiveWorkout() {
         ? <button className="iconbtn" aria-label={t('Close editor')} title={t('Close editor')} onClick={() => exitWorkoutEdit()}><Icon name="xmark" /></button>
         : <button className="iconbtn" aria-label={t('Minimize')} title={t('Minimize')} onClick={() => nav('/home')}><Icon name="chevronDown" /></button>}
       <div className="whdr-mid"><div className="whdr-name">{A.name}</div><div className="sub">{(A.backfill || editing) ? fmtDate(A.d, true) : <Elapsed start={A.start} />} · {t('{0} sets', done + '/' + total)}</div></div>
+      <div className="whdr-unit-toggle" role="group" aria-label={t('Weight unit')}>
+        <button
+          type="button"
+          className={'unit-btn' + ((S.unit || 'kg') === 'kg' ? ' active' : '')}
+          onClick={() => useStore.getState().setUnit('kg', { convert: true })}
+          aria-pressed={(S.unit || 'kg') === 'kg'}
+          data-testid="workout-unit-kg"
+        >
+          KG
+        </button>
+        <button
+          type="button"
+          className={'unit-btn' + (((S.unit || 'kg') === 'lb' || (S.unit || 'kg') === 'lbs') ? ' active' : '')}
+          onClick={() => useStore.getState().setUnit('lb', { convert: true })}
+          aria-pressed={((S.unit || 'kg') === 'lb' || (S.unit || 'kg') === 'lbs')}
+          data-testid="workout-unit-lbs"
+        >
+          LBS
+        </button>
+      </div>
       <button className="iconbtn" aria-label={t('Workout options')} title={t('Workout options')} onClick={openViewMenu}><Icon name="more" /></button>
       <button className="btn primary pill whdr-finish" aria-label={editing ? t('Save changes') : undefined}
         onClick={() => (editing ? finishWorkout() : finishWorkoutSheet({ onDiscard: discardWorkout }))}>{editing ? t('Save') : t('Finish')}</button>

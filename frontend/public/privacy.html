@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>APEX Fitness: Privacy Policy</title>
+<meta name="theme-color" content="#000000">
+<style>
+  :root {
+    --bg: #0d0e12;
+    --surface: #171922;
+    --acc: #00d26a;
+    --text: #f0f2f5;
+    --muted: #8a91a0;
+    --border: #262a36;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 24px 20px 60px;
+    line-height: 1.65;
+  }
+  .container { max-width: 680px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 4px; color: #fff; }
+  .updated { font-size: 0.85rem; color: var(--muted); margin-bottom: 24px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 20px 0;
+  }
+  h2 { font-size: 1.25rem; margin-top: 32px; margin-bottom: 10px; color: #fff; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  p, ul { margin: 0 0 14px; font-size: 0.95rem; }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--acc); text-decoration: underline; }
+  .back-btn {
+    display: inline-block;
+    padding: 8px 16px;
+    background: var(--surface);
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="javascript:history.back()" class="back-btn">&larr; Back to APEX</a>
+  <h1>Privacy Policy</h1>
+  <div class="updated">Last updated: October 25, 2026</div>
+
+  <div class="card">
+    <strong>Privacy First:</strong> APEX Fitness is designed around personal data ownership. You control your workout history, body measurements, and profile. We never sell your personal data, never share it with advertisers, and never train AI models on your private workouts.
+  </div>
+
+  <h2>1. Overview</h2>
+  <p>APEX Fitness is an offline-capable fitness tracking application engineered for Android, iOS, and the modern web. This policy describes how your information is handled.</p>
+
+  <h2>2. Google Account Authentication (OAuth 2.0)</h2>
+  <p>APEX Fitness provides Google Sign-In to securely identify your account and synchronize your fitness progress across devices.</p>
+  <ul>
+    <li><strong>Requested Information:</strong> Only basic identification: Google User ID, email address, display name, and avatar image.</li>
+    <li><strong>Purpose:</strong> Used exclusively for user authentication and cross-device data synchronization.</li>
+    <li><strong>No Broader Access:</strong> We never request access to Google Drive, contacts, calendars, or search histories.</li>
+    <li><strong>No Commercial Sharing:</strong> We do not sell or monetize your personal information.</li>
+  </ul>
+
+  <h2>3. Fitness Data & Cloud Synchronization</h2>
+  <p>When signed in, your workout sessions, sets, weights, routine templates, and body weight logs are securely synchronized with our cloud backend powered by Supabase PostgreSQL.</p>
+  <ul>
+    <li>All transmissions are encrypted via modern TLS 1.3.</li>
+    <li>Database tables are protected by strict per-user authorization boundaries.</li>
+  </ul>
+
+  <h2>4. Offline & Guest Mode</h2>
+  <p>You can use APEX Fitness completely offline without signing in. In guest mode, all your data resides strictly on your local device storage.</p>
+
+  <h2>5. Your Rights: Export & Deletion</h2>
+  <ul>
+    <li><strong>Export:</strong> Download your entire workout history as JSON at any time from <em>Settings &rarr; Data &rarr; Export</em>.</li>
+    <li><strong>Deletion:</strong> Permanently erase your account and all associated cloud data via <em>Settings &rarr; Data &rarr; Reset Everything</em>.</li>
+  </ul>
+
+  <h2>6. Contact</h2>
+  <p>For questions or assistance, reach us at <a href="https://github.com/swapnil-exxe/apex-fitness">github.com/swapnil-exxe/apex-fitness</a> or <code>support@apexfitness.app</code>.</p>
+</div>
+</body>
+</html>
