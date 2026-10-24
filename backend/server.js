@@ -828,6 +828,8 @@ function redirect(res, url, extraHeaders) {
 }
 function sendMobileAuthResponse(res, deepLinkUrl, clearCookie, user) {
   const safeName = user?.name ? String(user.name).replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'Athlete';
+  const queryStr = deepLinkUrl.includes('?') ? deepLinkUrl.slice(deepLinkUrl.indexOf('?') + 1) : '';
+  const intentUrl = `intent://auth/callback?${queryStr}#Intent;scheme=com.apex.fitness;package=com.apex.fitness;end;`;
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -853,6 +855,9 @@ function sendMobileAuthResponse(res, deepLinkUrl, clearCookie, user) {
   </div>
   <script>
     try {
+      if (/Android/i.test(navigator.userAgent)) {
+        window.location.href = ${JSON.stringify(intentUrl)};
+      }
       window.location.replace(${JSON.stringify(deepLinkUrl)});
     } catch (e) {}
   </script>

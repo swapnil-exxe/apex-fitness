@@ -171,14 +171,27 @@ function Shell() {
                 const { Browser } = await import('@capacitor/browser')
                 await Browser.close()
               } catch {}
-              const u = new URL(urlStr)
-              const error = u.searchParams.get('error')
+              let token = null
+              let userJson = null
+              let error = null
+              try {
+                const u = new URL(urlStr)
+                error = u.searchParams.get('error')
+                token = u.searchParams.get('token')
+                userJson = u.searchParams.get('user')
+              } catch {
+                const qIdx = urlStr.indexOf('?')
+                if (qIdx !== -1) {
+                  const sp = new URLSearchParams(urlStr.slice(qIdx + 1))
+                  error = sp.get('error')
+                  token = sp.get('token')
+                  userJson = sp.get('user')
+                }
+              }
               if (error) {
                 useUI.getState().toast(t('Sign-in error: {0}', error))
                 return
               }
-              const token = u.searchParams.get('token')
-              const userJson = u.searchParams.get('user')
               if (token) {
                 let user = null
                 if (userJson) {
@@ -204,6 +217,7 @@ function Shell() {
                   await useStore.getState().adoptProfile(askAddDeviceData)
                   await useStore.getState().loadConfig().catch(() => {})
                   await useStore.getState().pullState().catch(() => {})
+                  navigate('/home', { replace: true })
                   useUI.getState().toast(t('Welcome back, {0}', user.name))
                 }
               }
