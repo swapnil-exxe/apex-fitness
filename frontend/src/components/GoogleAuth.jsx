@@ -18,12 +18,12 @@ export function GoogleIcon({ size = 20 }) {
   )
 }
 
-export function GoogleSignInButton({ onClick, disabled, label }) {
+export function GoogleSignInButton({ onClick, disabled, label, busy }) {
   return (
     <Button
       variant="outline"
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || busy}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -31,11 +31,12 @@ export function GoogleSignInButton({ onClick, disabled, label }) {
         fontWeight: 600,
         backgroundColor: 'var(--bg-elevated, #fff)',
         color: 'var(--fg, #000)',
-        border: '1px solid var(--border, #ccc)'
+        border: '1px solid var(--border, #ccc)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
       }}
     >
       <GoogleIcon />
-      {label || t('Continue with Google')}
+      {busy ? t('Connecting to Google…') : (label || t('Continue with Google'))}
     </Button>
   )
 }

@@ -79,6 +79,16 @@ export default function Login() {
   const pwOn = passwordOn(config)
   const googleOn = config?.google_auth !== false && Boolean(config?.google_auth || import.meta.env.VITE_GOOGLE_AUTH === '1')
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const handleGoogleSignIn = async () => {
+    setBusy(true)
+    try {
+      await initiateGoogleSignIn({ mobile: MOBILE })
+    } finally {
+      setTimeout(() => setBusy(false), 5000)
+    }
+  }
 
   useEffect(() => {
     handleAuthUrlHash()
@@ -116,7 +126,7 @@ export default function Login() {
       <div className="muted" style={{ marginBottom: 30 }}>{t('Your workouts. Your weights. Your profile.')}</div>
       {googleOn ? (
         <div style={{ maxWidth: 360, margin: '0 auto', width: '100%' }}>
-          <GoogleSignInButton onClick={() => initiateGoogleSignIn()} />
+          <GoogleSignInButton onClick={handleGoogleSignIn} busy={busy} />
           <div style={{ height: 16 }} />
           <div className="dim small" style={{ margin: '8px 0 20px', lineHeight: 1.5 }}>
             {t('Sign in with Google to sync your fitness data across your devices with APEX Cloud.')}

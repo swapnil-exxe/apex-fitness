@@ -115,9 +115,20 @@ const lock = f => { try { fs.chmodSync(path.join(DATA, f), 0o600); } catch { /* 
 ['secret', 'db.json', 'coach.json'].forEach(lock);
 
 /* ---------- secret + db ---------- */
+const fallbackSecret = crypto.createHmac('sha256', process.env.GOOGLE_CLIENT_SECRET || process.env.DATABASE_URL || 'apex-fitness-secret').update('apex-auth-salt-2026').digest('hex');
 const secretFile = path.join(DATA, 'secret');
-if (!fs.existsSync(secretFile)) fs.writeFileSync(secretFile, crypto.randomBytes(32).toString('hex'), { mode: 0o600 });
-const SECRET = fs.readFileSync(secretFile, 'utf8').trim();
+if (!fs.existsSync(secretFile)) {
+  try {
+    fs.writeFileSync(secretFile, process.env.SESSION_SECRET || fallbackSecret, { mode: 0o600 });
+  } catch {}
+}
+let SECRET = process.env.SESSION_SECRET || fallbackSecret;
+if (fs.existsSync(secretFile)) {
+  try {
+    const fromFile = fs.readFileSync(secretFile, 'utf8').trim();
+    if (fromFile) SECRET = fromFile;
+  } catch {}
+}
 
 const dbFile = path.join(DATA, 'db.json');
 // Every account, passkey and invite. Only a missing file starts empty: an unreadable one (a write
@@ -843,7 +854,8 @@ function sendMobileAuthResponse(res, deepLinkUrl, clearCookie, user) {
     .icon { font-size: 48px; margin-bottom: 16px; }
     h1 { font-size: 22px; margin: 0 0 10px; color: #fff; }
     p { color: #8a91a0; font-size: 15px; line-height: 1.5; margin: 0 0 24px; }
-    .btn { display: block; width: 100%; box-sizing: border-box; background: #00d26a; color: #000; font-weight: 700; padding: 15px 20px; border-radius: 99px; text-decoration: none; font-size: 16px; margin-bottom: 14px; }
+    .btn { display: block; width: 100%; box-sizing: border-box; background: #00d26a; color: #000; font-weight: 700; padding: 16px 20px; border-radius: 99px; text-decoration: none; font-size: 17px; margin-bottom: 14px; box-shadow: 0 4px 16px rgba(0,210,106,0.3); }
+    .alt-btn { display: block; width: 100%; box-sizing: border-box; background: transparent; color: #8a91a0; border: 1px solid #262a36; font-weight: 600; padding: 12px 20px; border-radius: 99px; text-decoration: none; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -851,21 +863,27 @@ function sendMobileAuthResponse(res, deepLinkUrl, clearCookie, user) {
     <div class="icon">⚡</div>
     <h1>Welcome, ${safeName}!</h1>
     <p>Authentication was successful. Opening the APEX Fitness app...</p>
-    <a id="btn-open" class="btn" href="${deepLinkUrl}">Open APEX Fitness App</a>
+    <a id="btn-open" class="btn" href="${intentUrl}">🚀 Open APEX Fitness App</a>
+    <a class="alt-btn" href="${deepLinkUrl}">Alternative: Tap here if app didn't open</a>
   </div>
   <script>
-    try {
-      if (/Android/i.test(navigator.userAgent)) {
-        window.location.href = ${JSON.stringify(intentUrl)};
-      }
-      window.location.replace(${JSON.stringify(deepLinkUrl)});
-    } catch (e) {}
+    const intentUrl = ${JSON.stringify(intentUrl)};
+    const deepLinkUrl = ${JSON.stringify(deepLinkUrl)};
+    function launch() {
+      try {
+        if (/Android/i.test(navigator.userAgent)) {
+          window.location.href = intentUrl;
+        } else {
+          window.location.href = deepLinkUrl;
+        }
+      } catch (e) {}
+    }
+    setTimeout(launch, 100);
   </script>
 </body>
 </html>`;
 
-  res.writeHead(302, {
-    Location: deepLinkUrl,
+  res.writeHead(200, {
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',
     'Set-Cookie': clearCookie
@@ -876,6 +894,7 @@ function sendMobileAuthResponse(res, deepLinkUrl, clearCookie, user) {
 function sendMobileAuthError(res, errorMsg, clearCookie) {
   const safeErr = String(errorMsg || 'Authentication failed').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const deepLinkUrl = `com.apex.fitness://auth/callback?error=${encodeURIComponent(errorMsg || 'unknown')}`;
+  const intentUrl = `intent://auth/callback?error=${encodeURIComponent(errorMsg || 'unknown')}#Intent;scheme=com.apex.fitness;package=com.apex.fitness;end;`;
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -889,7 +908,7 @@ function sendMobileAuthError(res, errorMsg, clearCookie) {
     .icon { font-size: 48px; margin-bottom: 16px; }
     h1 { font-size: 22px; margin: 0 0 10px; color: #ff5c5c; }
     p { color: #8a91a0; font-size: 15px; line-height: 1.5; margin: 0 0 24px; }
-    .btn { display: block; width: 100%; box-sizing: border-box; background: #ff5c5c; color: #fff; font-weight: 700; padding: 15px 20px; border-radius: 99px; text-decoration: none; font-size: 16px; margin-bottom: 14px; }
+    .btn { display: block; width: 100%; box-sizing: border-box; background: #ff5c5c; color: #fff; font-weight: 700; padding: 16px 20px; border-radius: 99px; text-decoration: none; font-size: 16px; margin-bottom: 14px; }
   </style>
 </head>
 <body>
@@ -897,18 +916,26 @@ function sendMobileAuthError(res, errorMsg, clearCookie) {
     <div class="icon">⚠️</div>
     <h1>Sign-In Notice</h1>
     <p>${safeErr}</p>
-    <a id="btn-open" class="btn" href="${deepLinkUrl}">Return to APEX Fitness App</a>
+    <a id="btn-open" class="btn" href="${intentUrl}">Return to APEX Fitness App</a>
   </div>
   <script>
-    try {
-      window.location.replace(${JSON.stringify(deepLinkUrl)});
-    } catch (e) {}
+    const intentUrl = ${JSON.stringify(intentUrl)};
+    const deepLinkUrl = ${JSON.stringify(deepLinkUrl)};
+    function launch() {
+      try {
+        if (/Android/i.test(navigator.userAgent)) {
+          window.location.href = intentUrl;
+        } else {
+          window.location.href = deepLinkUrl;
+        }
+      } catch (e) {}
+    }
+    setTimeout(launch, 200);
   </script>
 </body>
 </html>`;
 
-  res.writeHead(302, {
-    Location: deepLinkUrl,
+  res.writeHead(200, {
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',
     'Set-Cookie': clearCookie
@@ -1985,11 +2012,17 @@ const googleAuthRoutes = {
     const stateCookieName = SECURE ? '__Host-google_oauth_state' : 'google_oauth_state';
     const clearStateCookie = `${stateCookieName}=; Path=/; Max-Age=0; HttpOnly;${SECURE} SameSite=Lax`;
 
-    const isMobileClient = Boolean(u.searchParams.get('mobile') === 'true' || /Android|iPhone|iPad|iPod/i.test(req.headers['user-agent'] || ''));
+    const stateCookieVal = cookieValues(req, stateCookieName)[0] || null;
+    const stateData = verifyStateCookie(state, SECRET) || verifyStateCookie(stateCookieVal, SECRET);
+    const isMobile = Boolean(
+      stateData?.isMobile ||
+      u.searchParams.get('mobile') === 'true' ||
+      /Android|iPhone|iPad|iPod|Mobile/i.test(req.headers['user-agent'] || '')
+    );
 
     if (oauthError) {
       audit(req, 'auth.google.fail', { ok: false, msg: oauthError });
-      if (isMobileClient) {
+      if (isMobile) {
         return sendMobileAuthError(res, oauthError, clearStateCookie);
       }
       return redirect(res, `${frontendUrl}/#auth-error=${encodeURIComponent(oauthError)}`, { 'Set-Cookie': clearStateCookie });
@@ -1997,18 +2030,15 @@ const googleAuthRoutes = {
 
     if (!code || !state) {
       audit(req, 'auth.google.fail', { ok: false, msg: 'missing-code-or-state' });
-      if (isMobileClient) {
+      if (isMobile) {
         return sendMobileAuthError(res, 'missing-params', clearStateCookie);
       }
       return redirect(res, `${frontendUrl}/#auth-error=missing-params`, { 'Set-Cookie': clearStateCookie });
     }
 
-    const stateCookieVal = cookieValues(req, stateCookieName)[0] || null;
-    const stateData = verifyStateCookie(state, SECRET) || verifyStateCookie(stateCookieVal, SECRET);
-
     if (!stateData || stateData.state !== state) {
       audit(req, 'auth.google.fail', { ok: false, msg: 'invalid-state' });
-      if (isMobileClient) {
+      if (isMobile) {
         return sendMobileAuthError(res, 'invalid-state', clearStateCookie);
       }
       return redirect(res, `${frontendUrl}/#auth-error=invalid-state`, { 'Set-Cookie': clearStateCookie });
@@ -2023,13 +2053,11 @@ const googleAuthRoutes = {
       });
     } catch (err) {
       audit(req, 'auth.google.fail', { ok: false, msg: 'verification-error', detail: err.message });
-      if (isMobileClient) {
+      if (isMobile) {
         return sendMobileAuthError(res, 'token-verification-failed', clearStateCookie);
       }
       return redirect(res, `${frontendUrl}/#auth-error=token-verification-failed`, { 'Set-Cookie': clearStateCookie });
     }
-
-    const isMobile = Boolean(stateData?.isMobile || isMobileClient);
 
     // 1. Existing Google Identity match
     let fedId = (db.federatedIdentities || []).find(f => f.provider === 'google' && f.providerSubject === claims.sub);

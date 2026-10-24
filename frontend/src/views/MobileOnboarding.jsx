@@ -130,26 +130,40 @@ export function ConnectSheet({ close, initialUrl = 'https://apex-fitness-fd32.on
 
 export default function MobileOnboarding() {
   const { chooseLocalMode } = useStore()
+  const [busy, setBusy] = useState(false)
+
+  const handleGoogleSignIn = async () => {
+    setBusy(true)
+    try {
+      await initiateGoogleSignIn({ mobile: true })
+    } finally {
+      setTimeout(() => setBusy(false), 5000)
+    }
+  }
+
   const head = <>
-    <div style={{ fontSize: 54, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="dumbbell" /></div>
-    <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-.028em', margin: '10px 0 4px' }}>APEX</h1>
+    <div style={{ fontSize: 58, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="dumbbell" /></div>
+    <h1 style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-.03em', margin: '12px 0 6px' }}>APEX FITNESS</h1>
   </>
-  const wrap = { display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '78vh', textAlign: 'center' }
+  const wrap = { display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '82vh', textAlign: 'center', padding: '0 16px' }
   return (
     <div className="narrow" style={wrap}>
       {head}
-      <div className="muted" style={{ marginBottom: 30 }}>{t('How do you want to use APEX?')}</div>
+      <div className="muted" style={{ fontSize: 16, marginBottom: 36, lineHeight: 1.45 }}>
+        {t('Track workouts. Break records. Synchronize everywhere.')}
+      </div>
       <div style={{ maxWidth: 360, margin: '0 auto', width: '100%' }}>
-        <GoogleSignInButton onClick={() => initiateGoogleSignIn({ mobile: true })} />
-        <div style={{ height: 14 }} />
-        <Button variant="primary" icon="lock" onClick={() => chooseLocalMode()}>{t('Use on this device (offline)')}</Button>
-        <div style={{ height: 10 }} />
-        <Button icon="cloud" onClick={() => useUI.getState().openSheet(close => <ConnectSheet close={close} />)}>{t('Connect to custom server')}</Button>
-        <div className="dim small" style={{ marginTop: 24, lineHeight: 1.5 }}>
-          {t('Sign in with Google to sync your fitness data across your devices. Local keeps data only on this phone.')}
+        <GoogleSignInButton onClick={handleGoogleSignIn} busy={busy} />
+        <div style={{ height: 16 }} />
+        <Button variant="ghost" className="dim" icon="lock" onClick={() => chooseLocalMode()}>
+          {t('Use on this device (offline)')}
+        </Button>
+        <div className="dim small" style={{ marginTop: 28, lineHeight: 1.6 }}>
+          {t('Sign in with Google to automatically back up and synchronize your workout logs, personal records, and routines with APEX Cloud.')}
+          <div style={{ marginTop: 10, fontSize: 11, opacity: 0.7 }}>
+            {t('End-to-end encrypted storage • No advertisements')}
+          </div>
         </div>
-        <div style={{ height: 18 }} />
-        <Button icon="gear" onClick={() => openCfAccess()}>{t('Connection settings')}</Button>
       </div>
     </div>
   )
