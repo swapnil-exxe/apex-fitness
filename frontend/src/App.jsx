@@ -153,18 +153,30 @@ function Shell() {
     window.addEventListener('hashchange', onHashChange)
 
     let removeListener = null
-    if (MOBILE) {
-      import('@capacitor/app').then(({ App }) => {
-        App.addListener('appUrlOpen', async data => {
-          if (!data?.url) return
-          const urlStr = data.url
-          if (urlStr.startsWith('com.apex.fitness://auth/callback')) {
+    const isNative = Boolean(
+      MOBILE ||
+      (typeof window !== 'undefined' && (
+        window.Capacitor?.isNativePlatform() ||
+        window.location.protocol === 'capacitor:'
+      ))
+    )
+
+    if (isNative) {
+      import('@capacitor/app').then(async ({ App }) => {
+        const handleDeepLinkUrl = async (urlStr) => {
+          if (!urlStr || typeof urlStr !== 'string') return
+          if (urlStr.startsWith('com.apex.fitness://auth/callback') || urlStr.includes('auth/callback')) {
             try {
               try {
                 const { Browser } = await import('@capacitor/browser')
                 await Browser.close()
               } catch {}
               const u = new URL(urlStr)
+              const error = u.searchParams.get('error')
+              if (error) {
+                useUI.getState().toast(t('Sign-in error: {0}', error))
+                return
+              }
               const token = u.searchParams.get('token')
               const userJson = u.searchParams.get('user')
               if (token) {
@@ -185,7 +197,7 @@ function Shell() {
             } catch (err) {
               console.error('Failed to parse mobile auth callback', err)
             }
-          } else if (urlStr.startsWith('com.apex.fitness://auth/link')) {
+          } else if (urlStr.startsWith('com.apex.fitness://auth/link') || urlStr.includes('auth/link')) {
             try {
               const u = new URL(urlStr)
               const token = u.searchParams.get('token')
@@ -198,7 +210,21 @@ function Shell() {
               console.error('Failed to parse mobile auth link', err)
             }
           }
-        }).then(h => { removeListener = h })
+        }
+
+        try {
+          const launch = await App.getLaunchUrl()
+          if (launch?.url) {
+            handleDeepLinkUrl(launch.url)
+          }
+        } catch {}
+
+        try {
+          const listener = await App.addListener('appUrlOpen', data => {
+            if (data?.url) handleDeepLinkUrl(data.url)
+          })
+          removeListener = listener
+        } catch {}
       }).catch(() => {})
     }
 

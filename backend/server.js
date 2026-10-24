@@ -856,11 +856,80 @@ function sendMobileAuthResponse(res, deepLinkUrl, intentUrl, clearCookie, user, 
   <script>
     const deepLink = ${JSON.stringify(deepLinkUrl)};
     const intentUrl = ${JSON.stringify(intentUrl)};
-    try {
-      window.location.href = deepLink;
-      setTimeout(function() {
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const btn = document.getElementById('btn-open');
+    if (btn && isAndroid) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
         window.location.href = intentUrl;
-      }, 500);
+      });
+    }
+    try {
+      if (isAndroid) {
+        window.location.href = intentUrl;
+        setTimeout(function() { window.location.href = deepLink; }, 600);
+      } else {
+        window.location.href = deepLink;
+      }
+    } catch (e) {}
+  </script>
+</body>
+</html>`;
+
+  res.writeHead(200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Set-Cookie': clearCookie
+  });
+  res.end(html);
+}
+
+function sendMobileAuthError(res, errorMsg, clearCookie, fallbackUrl) {
+  const safeErr = String(errorMsg || 'Authentication failed').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const deepLinkUrl = `com.apex.fitness://auth/callback?error=${encodeURIComponent(errorMsg || 'unknown')}`;
+  const intentUrl = `intent://auth/callback?error=${encodeURIComponent(errorMsg || 'unknown')}#Intent;scheme=com.apex.fitness;package=com.apex.fitness;end;`;
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>APEX Fitness - Sign-In</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #08090d; color: #f0f2f5; text-align: center; padding: 48px 20px; margin: 0; }
+    .card { max-width: 400px; margin: 0 auto; background: #171922; border: 1px solid #3b2226; border-radius: 20px; padding: 36px 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h1 { font-size: 22px; margin: 0 0 10px; color: #ff5c5c; }
+    p { color: #8a91a0; font-size: 15px; line-height: 1.5; margin: 0 0 24px; }
+    .btn { display: block; width: 100%; box-sizing: border-box; background: #ff5c5c; color: #fff; font-weight: 700; padding: 15px 20px; border-radius: 99px; text-decoration: none; font-size: 16px; margin-bottom: 14px; }
+    .alt-btn { display: block; width: 100%; box-sizing: border-box; background: transparent; color: #8a91a0; border: 1px solid #262a36; font-weight: 600; padding: 13px 20px; border-radius: 99px; text-decoration: none; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">⚠️</div>
+    <h1>Sign-In Notice</h1>
+    <p>${safeErr}</p>
+    <a id="btn-open" class="btn" href="${deepLinkUrl}">Return to APEX Fitness App</a>
+    <a class="alt-btn" href="${fallbackUrl || 'https://apex-fitness.vercel.app'}">Return to Web</a>
+  </div>
+  <script>
+    const deepLink = ${JSON.stringify(deepLinkUrl)};
+    const intentUrl = ${JSON.stringify(intentUrl)};
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const btn = document.getElementById('btn-open');
+    if (btn && isAndroid) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        window.location.href = intentUrl;
+      });
+    }
+    try {
+      if (isAndroid) {
+        window.location.href = intentUrl;
+      } else {
+        window.location.href = deepLink;
+      }
     } catch (e) {}
   </script>
 </body>
@@ -1943,21 +2012,32 @@ const googleAuthRoutes = {
     const stateCookieName = SECURE ? '__Host-google_oauth_state' : 'google_oauth_state';
     const clearStateCookie = `${stateCookieName}=; Path=/; Max-Age=0; HttpOnly;${SECURE} SameSite=Lax`;
 
+    const isMobileClient = Boolean(u.searchParams.get('mobile') === 'true' || /Android|iPhone|iPad|iPod/i.test(req.headers['user-agent'] || ''));
+
     if (oauthError) {
       audit(req, 'auth.google.fail', { ok: false, msg: oauthError });
+      if (isMobileClient) {
+        return sendMobileAuthError(res, oauthError, clearStateCookie, `${frontendUrl}/#auth-error=${encodeURIComponent(oauthError)}`);
+      }
       return redirect(res, `${frontendUrl}/#auth-error=${encodeURIComponent(oauthError)}`, { 'Set-Cookie': clearStateCookie });
     }
 
     if (!code || !state) {
       audit(req, 'auth.google.fail', { ok: false, msg: 'missing-code-or-state' });
+      if (isMobileClient) {
+        return sendMobileAuthError(res, 'Missing authorization code or state parameters.', clearStateCookie, `${frontendUrl}/#auth-error=missing-params`);
+      }
       return redirect(res, `${frontendUrl}/#auth-error=missing-params`, { 'Set-Cookie': clearStateCookie });
     }
 
     const stateCookieVal = cookieValues(req, stateCookieName)[0] || null;
-    const stateData = verifyStateCookie(stateCookieVal, SECRET) || verifyStateCookie(state, SECRET);
+    const stateData = verifyStateCookie(state, SECRET) || verifyStateCookie(stateCookieVal, SECRET);
 
     if (!stateData || stateData.state !== state) {
       audit(req, 'auth.google.fail', { ok: false, msg: 'invalid-state' });
+      if (isMobileClient) {
+        return sendMobileAuthError(res, 'Authentication session expired. Please return to the APEX app and sign in again.', clearStateCookie, `${frontendUrl}/#auth-error=invalid-state`);
+      }
       return redirect(res, `${frontendUrl}/#auth-error=invalid-state`, { 'Set-Cookie': clearStateCookie });
     }
 
@@ -1970,10 +2050,13 @@ const googleAuthRoutes = {
       });
     } catch (err) {
       audit(req, 'auth.google.fail', { ok: false, msg: 'verification-error', detail: err.message });
+      if (isMobileClient) {
+        return sendMobileAuthError(res, 'Google token verification failed: ' + (err.message || 'unknown error'), clearStateCookie, `${frontendUrl}/#auth-error=token-verification-failed`);
+      }
       return redirect(res, `${frontendUrl}/#auth-error=token-verification-failed`, { 'Set-Cookie': clearStateCookie });
     }
 
-    const isMobile = stateData.isMobile;
+    const isMobile = Boolean(stateData?.isMobile || isMobileClient);
 
     // 1. Existing Google Identity match
     let fedId = (db.federatedIdentities || []).find(f => f.provider === 'google' && f.providerSubject === claims.sub);

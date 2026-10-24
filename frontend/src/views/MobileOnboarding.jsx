@@ -10,6 +10,7 @@ import { Button } from '../components/ui.jsx'
 import { askAddDeviceData } from '../sheets.jsx'
 import { normalizeServerUrl } from '../lib/remote.js'
 import { loadCfAccess, saveCfAccess } from '../lib/cf-access.js'
+import { GoogleSignInButton, initiateGoogleSignIn } from '../components/GoogleAuth.jsx'
 
 // A plain http:// server works (#428), but whatever the app sends, the pairing code and then its
 // token, crosses the network readable. Said once under the field, not in the way: on a home
@@ -99,6 +100,13 @@ export function ConnectSheet({ close, initialUrl = 'https://apex-fitness-fd32.on
   }
   return <>
     <h3>{again ? t('Pair again') : t('Connect to my server')}</h3>
+    {!again && (
+      <div style={{ marginBottom: 16 }}>
+        <GoogleSignInButton onClick={() => { close(); initiateGoogleSignIn({ mobile: true }) }} label={t('Sign in with Google instead')} />
+        <div style={{ height: 14 }} />
+        <div className="dim small" style={{ textAlign: 'center' }}>{t('— or enter server details below —')}</div>
+      </div>
+    )}
     <div className="muted small" style={{ marginBottom: 14 }}>
       {again
         ? t('Open Settings → Account → “Pair the mobile app” on your APEX site in a browser and enter the new code shown there. What this phone kept is merged into your account.')
@@ -130,15 +138,19 @@ export default function MobileOnboarding() {
   return (
     <div className="narrow" style={wrap}>
       {head}
-      <div className="muted" style={{ marginBottom: 34 }}>{t('How do you want to use APEX?')}</div>
-      <Button variant="primary" icon="lock" onClick={() => chooseLocalMode()}>{t('Use on this device')}</Button>
-      <div style={{ height: 10 }} />
-      <Button icon="cloud" onClick={() => useUI.getState().openSheet(close => <ConnectSheet close={close} />)}>{t('Connect to my server')}</Button>
-      <div className="dim small" style={{ marginTop: 26, lineHeight: 1.5 }}>
-        {t('Local keeps everything on this phone. Connecting syncs to your own APEX server instead. You can switch later in Settings.')}
+      <div className="muted" style={{ marginBottom: 30 }}>{t('How do you want to use APEX?')}</div>
+      <div style={{ maxWidth: 360, margin: '0 auto', width: '100%' }}>
+        <GoogleSignInButton onClick={() => initiateGoogleSignIn({ mobile: true })} />
+        <div style={{ height: 14 }} />
+        <Button variant="primary" icon="lock" onClick={() => chooseLocalMode()}>{t('Use on this device (offline)')}</Button>
+        <div style={{ height: 10 }} />
+        <Button icon="cloud" onClick={() => useUI.getState().openSheet(close => <ConnectSheet close={close} />)}>{t('Connect to custom server')}</Button>
+        <div className="dim small" style={{ marginTop: 24, lineHeight: 1.5 }}>
+          {t('Sign in with Google to sync your fitness data across your devices. Local keeps data only on this phone.')}
+        </div>
+        <div style={{ height: 18 }} />
+        <Button icon="gear" onClick={() => openCfAccess()}>{t('Connection settings')}</Button>
       </div>
-      <div style={{ height: 18 }} />
-      <Button icon="gear" onClick={() => openCfAccess()}>{t('Connection settings')}</Button>
     </div>
   )
 }

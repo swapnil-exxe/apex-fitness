@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:mobile": "VITE_MOBILE=1 vite build && node ../scripts/catalogue/stage-media.mjs dist && cap sync android && node scripts/check-mobile-bundle.mjs",
+    "build:mobile": "VITE_MOBILE=1 VITE_GOOGLE_AUTH=1 VITE_API_URL=https://apex-fitness-fd32.onrender.com vite build && node ../scripts/catalogue/stage-media.mjs dist && cap sync android && node scripts/check-mobile-bundle.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
