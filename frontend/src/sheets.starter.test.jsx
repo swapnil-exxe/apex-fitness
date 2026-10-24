@@ -53,7 +53,7 @@ describe('starter plan chooser', () => {
     starterPlanSheet()
     const host = renderTop()
     expect([...host.querySelectorAll('.item .tt')].map(el => el.textContent))
-      .toEqual(['Push / Pull / Legs', 'Upper / Lower', 'Full Body', '5×5', 'APEX 6-Day V-Taper & Strength'])
+      .toEqual(['Push / Pull / Legs', 'Upper / Lower', 'Full Body', '5×5', 'APEX 6-Day V-Taper & Strength', 'V-Taper & Hypertrophy Split (6-Day)'])
     expect(rowFor(host, 'Upper / Lower').querySelector('.ss').textContent).toContain('4 days per week')
   })
 

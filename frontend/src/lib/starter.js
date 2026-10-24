@@ -43,6 +43,57 @@ const APEX_VSHAPE = [
   ['apex-legs-b', 'APEX Legs B (Posterior Chain)', 'legs', [['0085', 4, 8], ['0739', 4, 10], ['0586', 4, 12], ['0605', 4, 15]]]
 ]
 
+const HYPERTROPHY_FOCUS = [
+  ['hf-push-a', 'Push A (Shoulders & Chest)', 'barbell', [
+    ['0314', 3, 8],
+    ['0171', 3, 12],
+    ['0426', 2, 10],
+    ['8901', 4, 15],
+    ['1724', 3, 12],
+    ['0241', 2, 12]
+  ]],
+  ['hf-pull-a', 'Pull A (Lats & Width)', 'pullup', [
+    ['1429', 3, 8],
+    ['0238', 3, 12],
+    ['1204', 3, 10],
+    ['1323', 3, 10],
+    ['1627', 3, 10],
+    ['0313', 2, 12]
+  ]],
+  ['hf-legs-abs', 'Legs + Abs', 'legs', [
+    ['0739', 3, 10],
+    ['0085', 3, 8],
+    ['0585', 3, 12],
+    ['8604', 3, 12],
+    ['0605', 4, 15],
+    ['9819', 3, 12],
+    ['0175', 3, 12]
+  ]],
+  ['hf-push-b', 'Push B (Upper Chest & Delts)', 'barbell', [
+    ['0757', 3, 10],
+    ['1030', 3, 12],
+    ['8901', 4, 15],
+    ['1451', 3, 10],
+    ['1724', 2, 12]
+  ]],
+  ['hf-pull-b', 'Pull B (Back & Traps)', 'pullup', [
+    ['1359', 3, 10],
+    ['1323', 2, 10],
+    ['2291', 3, 10],
+    ['5527', 3, 15],
+    ['0406', 3, 12]
+  ]],
+  ['hf-arms-neck-abs', 'Biceps + Forearms + Neck + Abs', 'figureStrength', [
+    ['0447', 3, 10],
+    ['3764', 2, 12],
+    ['0313', 2, 12],
+    ['0451', 2, 12],
+    ['0175', 3, 12],
+    ['1043', 2, 15],
+    ['1042', 2, 15]
+  ]]
+]
+
 // [weekday, routineKey] — weekday is a DAYN index, so 1 is Monday. Fixed weeks only: every
 // plan repeats the same seven days, which is all the weekly plan model can represent.
 const PLANS = {
@@ -53,6 +104,10 @@ const PLANS = {
   'apex-vshape': {
     routines: APEX_VSHAPE,
     schedule: [[1, 'apex-push-a'], [2, 'apex-pull-a'], [3, 'apex-legs-a'], [4, 'apex-push-b'], [5, 'apex-pull-b'], [6, 'apex-legs-b']]
+  },
+  'hypertrophy-focus': {
+    routines: HYPERTROPHY_FOCUS,
+    schedule: [[1, 'hf-push-a'], [2, 'hf-pull-a'], [3, 'hf-legs-abs'], [5, 'hf-push-b'], [6, 'hf-pull-b'], [0, 'hf-arms-neck-abs']]
   }
 }
 

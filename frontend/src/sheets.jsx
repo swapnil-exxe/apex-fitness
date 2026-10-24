@@ -169,7 +169,8 @@ const PLAN_COPY = {
   'upper-lower': () => ({ name: t('Upper / Lower'), about: t('Upper body twice, lower body twice.') }),
   'full-body': () => ({ name: t('Full Body'), about: t('Three sessions, the whole body each time.') }),
   '5x5': () => ({ name: t('5×5'), about: t('Five sets of five on the main barbell lifts.') }),
-  'apex-vshape': () => ({ name: t('APEX 6-Day V-Taper & Strength'), about: t('6-day PPL split focused on broad shoulders, wide lats, upper chest and progressive overload.') })
+  'apex-vshape': () => ({ name: t('APEX 6-Day V-Taper & Strength'), about: t('6-day PPL split focused on broad shoulders, wide lats, upper chest and progressive overload.') }),
+  'hypertrophy-focus': () => ({ name: t('V-Taper & Hypertrophy Split (6-Day)'), about: t('Broad shoulders, wide lats, upper chest, arms, traps & abs with dedicated arm/neck day.') })
 }
 
 // Adds the plan's routines (reusing one you already have under the same name) and puts them on

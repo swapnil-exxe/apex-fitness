@@ -36,7 +36,8 @@ describe('starter plan catalog', () => {
     expect(starterPlanOptions()).toEqual([
       { id: 'ppl', days: 3 }, { id: 'upper-lower', days: 4 },
       { id: 'full-body', days: 3 }, { id: '5x5', days: 3 },
-      { id: 'apex-vshape', days: 6 }
+      { id: 'apex-vshape', days: 6 },
+      { id: 'hypertrophy-focus', days: 6 }
     ])
     for (const { id, days } of starterPlanOptions()) expect(starterPlanDays(id)).toHaveLength(days)
   })
