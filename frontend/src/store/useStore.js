@@ -1902,12 +1902,11 @@ export const useStore = create((set, get) => {
           // again; the address is gone, so pairing asks for it.
           markOwed(true)
           failed({ status: 0, code: 'not-paired' }, { pending: true })
-        } else get().setGuest(true)
+        } else if (remote?.mode === 'local' || (saved && hasData(saved))) {
+          get().setGuest(true)
+        }
         syncReminder(get().S)
-        // Only a genuinely first launch — nothing chosen yet and nothing to lose either — offers
-        // the choice. Picking local (even with no data yet) persists that choice below and this
-        // never asks again.
-        finishBoot({ needsMobileOnboarding: !remote && !hasData(get().S) })
+        finishBoot({ needsMobileOnboarding: false })
         return
       }
       // Demo build (GitHub Pages): no backend at all — seed once, stay in guest mode.

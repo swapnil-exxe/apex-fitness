@@ -260,10 +260,26 @@ function readState(uid) {
 // second answers 503 instead of an empty profile, which a device would adopt, or a write would
 // replace, losing what a restore could still bring back.
 const UNREADABLE = Symbol('unreadable');
-function readStateStrict(uid) {
+async function readStateStrict(uid) {
   let raw;
   try { raw = fs.readFileSync(stateFile(uid), 'utf8'); }
-  catch (e) { return e.code === 'ENOENT' ? null : UNREADABLE; }
+  catch (e) {
+    if (e.code === 'ENOENT') {
+      if (process.env.DATABASE_URL) {
+        try {
+          const pgState = await dbService.getUserState(uid);
+          if (pgState) {
+            try { atomicWrite(stateFile(uid), JSON.stringify(pgState)); } catch {}
+            return pgState;
+          }
+        } catch (dbErr) {
+          console.warn('[PostgreSQL] getUserState fallback error:', dbErr.message);
+        }
+      }
+      return null;
+    }
+    return UNREADABLE;
+  }
   try { return JSON.parse(raw); } catch { return UNREADABLE; }
 }
 // A stored document as a client gets it: without the server's own notes `_unstamped` and `_prior`.
@@ -723,6 +739,11 @@ const clearCookie = COOKIE === LEGACY_COOKIE
 // The password routes are deliberately NOT here. A name and a password are a credential too,
 // but one a hostile page can know — its own — so an exempt POST /api/login/password would let
 // any site sign a visitor into the attacker's account and collect what they log (login CSRF).
+
+
+// The Capacitor WebView origins of the Android and iOS app.
+const APP_ORIGINS = new Set(['https://localhost', 'capacitor://localhost', 'http://localhost']);
+
 const CSRF_EXEMPT = new Set([
   'POST /api/register/options', 'POST /api/register/verify',
   'POST /api/login/options', 'POST /api/login/verify',
@@ -736,6 +757,8 @@ function csrfOk(req, key) {
   // The paired mobile app authenticates with a Bearer token. A browser never attaches one on its
   // own, so there is no ambient authority for a hostile page to borrow and no origin to check.
   if ((req.headers.authorization || '').startsWith('Bearer ')) return true;
+  const origin = req.headers.origin;
+  if (origin && APP_ORIGINS.has(origin)) return true;
   // Sec-Fetch-Site is set by the browser itself and no page can forge it, and it states exactly
   // the property wanted here — more precisely than comparing origins can. 'same-origin' is the
   // app talking to its own backend; a hostile page reports 'cross-site'; a sibling subdomain,
@@ -744,7 +767,6 @@ function csrfOk(req, key) {
   // ORIGIN. Absent on older Safari and on proxies that strip it, hence the fallback below.
   const site = req.headers['sec-fetch-site'];
   if (site) return site === 'same-origin' || site === 'none';
-  const origin = req.headers.origin;
   // No Origin header at all means no browser sent this — curl, a script, a monitoring check.
   // Browsers put an Origin on every state-changing request and a page cannot suppress it, so the
   // forgery this exists to stop always carries one.
@@ -1355,7 +1377,7 @@ const passwordRoutes = {
       if (!still()) return json(res, 401, WRONG);
     }
     audit(req, 'auth.password.ok', { user });
-    json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { ok: true, user: publicUser(user), token: makeSession(user) }, { 'Set-Cookie': sessionCookie(user) });
   },
 
   // For browsers that cannot make a passkey at all: plain http on a LAN address, some Firefox
@@ -1408,7 +1430,7 @@ const passwordRoutes = {
     db.users.push(user);
     saveDb();
     audit(req, 'auth.register.ok', { user, msg: inv ? inv.code + ' · password' : 'password' });
-    json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { ok: true, user: publicUser(user), token: makeSession(user) }, { 'Set-Cookie': sessionCookie(user) });
   },
 
   // What Settings shows: whether a password is set, and whether it could be removed.
@@ -1583,7 +1605,7 @@ const passwordRoutes = {
     ACCOUNT_FAILS.clear(acctKey(user));
     saveDb();
     audit(req, 'auth.password.reset', { user });
-    json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { ok: true, user: publicUser(user), token: makeSession(user) }, { 'Set-Cookie': sessionCookie(user) });
   }
 };
 
@@ -1885,7 +1907,7 @@ const googleAuthRoutes = {
     }
 
     const stateCookieVal = cookieValues(req, stateCookieName)[0] || null;
-    const stateData = verifyStateCookie(stateCookieVal, SECRET);
+    const stateData = verifyStateCookie(stateCookieVal, SECRET) || verifyStateCookie(state, SECRET);
 
     if (!stateData || stateData.state !== state) {
       audit(req, 'auth.google.fail', { ok: false, msg: 'invalid-state' });
@@ -2557,7 +2579,7 @@ const routes = {
   'GET /api/data': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    const state = readStateStrict(user.id);
+    const state = await readStateStrict(user.id);
     if (state === UNREADABLE) { console.error('state file unreadable for', user.id); return json(res, 503, { error: 'state unreadable' }); }
     notePull(user);
     json(res, 200, { state: forClient(state), rev: state?._rev || 0 });
@@ -2571,7 +2593,16 @@ const routes = {
   'GET /api/data/rev': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    const doc = readStateCached(user.id);
+    let doc = readStateCached(user.id);
+    if (!doc && process.env.DATABASE_URL) {
+      try {
+        const pgState = await dbService.getUserState(user.id);
+        if (pgState) {
+          try { atomicWrite(stateFile(user.id), JSON.stringify(pgState)); } catch {}
+          doc = pgState;
+        }
+      } catch {}
+    }
     json(res, 200, { rev: doc?._rev || 0, ...(doc?._wid ? { wid: doc._wid } : {}) });
   },
 
@@ -2610,7 +2641,7 @@ const routes = {
     // before revisions, or a deliberate replace such as a backup import) overwrites, as before.
     // readState and atomicWrite are synchronous with nothing awaited between them, so the
     // compare-and-write is atomic for this process.
-    const cur = readStateStrict(user.id);
+    const cur = await readStateStrict(user.id);
     if (cur === UNREADABLE) { console.error('state file unreadable for', user.id); return json(res, 503, { error: 'state unreadable' }); }
     const curRev = cur?._rev || 0;
     // `_rev` is a counter, so after the data directory went back in time (a restored backup, a
@@ -3009,8 +3040,7 @@ function bodyDeadline(req) {
   req.allowSlowBody = clear;
 }
 
-// The Capacitor WebView origins of the Android and iOS app.
-const APP_ORIGINS = new Set(['https://localhost', 'capacitor://localhost', 'http://localhost']);
+
 
 const server = http.createServer(async (req, res) => {
   bodyDeadline(req);

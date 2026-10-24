@@ -37,22 +37,13 @@ export function generateAuthUrl({ origin, isMobile = false, returnTo = '/', stat
   const client = createGoogleOAuthClient(origin);
 
   // Cryptographically random state & PKCE code verifier
-  const state = crypto.randomBytes(32).toString('base64url');
+  const nonce = crypto.randomBytes(32).toString('base64url');
   const codeVerifier = crypto.randomBytes(32).toString('base64url');
   const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
 
-  const authUrl = client.generateAuthUrl({
-    access_type: 'offline',
-    scope: ['openid', 'email', 'profile'],
-    state,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
-    prompt: 'select_account'
-  });
-
-  // State cookie payload: signed, expires in 10 minutes
+  // State payload: signed with HMAC, expires in 10 minutes
   const statePayload = {
-    state,
+    nonce,
     codeVerifier,
     isMobile: Boolean(isMobile),
     returnTo: typeof returnTo === 'string' && returnTo.startsWith('/') ? returnTo : '/',
@@ -63,9 +54,18 @@ export function generateAuthUrl({ origin, isMobile = false, returnTo = '/', stat
   const mac = crypto.createHmac('sha256', stateSecret).update(serialized).digest('base64url');
   const cookieValue = `${Buffer.from(serialized).toString('base64url')}.${mac}`;
 
+  const authUrl = client.generateAuthUrl({
+    access_type: 'offline',
+    scope: ['openid', 'email', 'profile'],
+    state: cookieValue,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+    prompt: 'select_account'
+  });
+
   return {
     url: authUrl,
-    state,
+    state: cookieValue,
     cookieValue
   };
 }
@@ -86,6 +86,7 @@ export function verifyStateCookie(cookieValue, stateSecret) {
     const data = JSON.parse(raw);
     if (!data || typeof data !== 'object') return null;
     if (data.exp && data.exp < Date.now()) return null;
+    if (!data.state) data.state = cookieValue;
     return data;
   } catch {
     return null;

@@ -108,7 +108,8 @@ const appVersion = process.env.APP_BUILD ? `${pkgVersion}+${process.env.APP_BUIL
 export default defineConfig(({ mode }) => ({
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
-    'import.meta.env.VITE_GOOGLE_AUTH': JSON.stringify(mode === 'test' ? '0' : '1')
+    'import.meta.env.VITE_GOOGLE_AUTH': JSON.stringify(mode === 'test' ? '0' : '1'),
+    'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'https://apex-fitness-fd32.onrender.com')
   },
   plugins: [react(), umami, flavor, swStamp, catalogueMedia],
   base: './',

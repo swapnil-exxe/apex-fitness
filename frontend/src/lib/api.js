@@ -19,11 +19,23 @@ export const vault = () => (IS_APPLE ? t('iCloud Keychain') : IS_ANDROID ? t('Go
 // only after the user chooses a passkey action and surface any genuine browser error there.
 export const webauthnOK = () => typeof window.PublicKeyCredential !== 'undefined'
 
-// The paired mobile app (lib/remote.js) is the only caller of these — everywhere else stays on
-// same-origin cookies, so remoteBase/remoteToken stay empty and api() behaves exactly as before.
+export const DEFAULT_API_BASE = (import.meta.env.VITE_API_URL || 'https://apex-fitness-fd32.onrender.com').replace(/\/$/, '')
+
+// The paired mobile app (lib/remote.js) sets remoteBase/remoteToken — everywhere else stays on
+// same-origin cookies, so remoteToken stays empty.
 let remoteBase = ''
 let remoteToken = null
-export function setRemoteAuth(base, token) { remoteBase = base || ''; remoteToken = token || null }
+
+const PUBLIC_PREFIXES = ['/api/config', '/api/auth/', '/api/login/', '/api/register/', '/api/pair/redeem']
+const isPublicPath = p => PUBLIC_PREFIXES.some(prefix => p.startsWith(prefix))
+
+export function setRemoteAuth(base, token) {
+  remoteBase = base || ''
+  remoteToken = token || null
+}
+export function getRemoteAuth() {
+  return { base: remoteBase, token: remoteToken }
+}
 // A Cloudflare Access service token (lib/cf-access.js): sent only to the origin it was entered
 // for, never on a same-origin request, where the browser's own Access session cookie already
 // does the job, and never to a server that merely happens to be paired or typed in.
@@ -54,11 +66,16 @@ export async function api(path, opts) {
   // server, which answers ANY path, PUT included, with index.html and a 200, so a push "landed"
   // there and the change was marked as synced while the server never saw it. status 0, not
   // undefined: this is not "offline", and the store must not show it as such.
-  if (MOBILE && !remoteBase) throw failure(t('This phone is not connected to a server.'), 'not-paired', 0)
+  // A phone with no server to talk to: local mode, or a pairing that is gone.
+  // Public auth/config routes can use DEFAULT_API_BASE on mobile before sign-in.
+  const effectiveBase = remoteBase || (MOBILE ? DEFAULT_API_BASE : '')
+  if (MOBILE && !remoteToken && !isPublicPath(path)) {
+    throw failure(t('This phone is not connected to a server.'), 'not-paired', 0)
+  }
   const headers = Object.assign({ 'Content-Type': 'application/json' }, init.headers, remoteHeaders())
   // A paired phone has an absolute base of its own; everyone else is relative to where the app
   // is served, so a subpath deployment reaches its own API instead of the proxy's root.
-  const url = remoteBase ? remoteBase + path : appBase().replace(/\/$/, '') + path
+  const url = effectiveBase ? effectiveBase + path : appBase().replace(/\/$/, '') + path
   const ms = timeout != null ? timeout : (init.method || 'GET').toUpperCase() === 'GET' ? TIMEOUT_GET_MS : TIMEOUT_MS
   return request(url, Object.assign({}, init, { headers }), ms)
 }
@@ -413,15 +430,39 @@ const post = (path, body) => api(path, { method: 'POST', body: JSON.stringify(bo
 // the server matches against the profile's sign-in e-mail when it holds an "@" and against the
 // name otherwise — so the app and a server a version apart still understand each other.
 export async function passwordLogin(name, password) {
-  return (await post('/api/login/password', { name, password })).user
+  const res = await post('/api/login/password', { name, password })
+  if (MOBILE && res?.token) {
+    setRemoteAuth(remoteBase || DEFAULT_API_BASE, res.token)
+    try {
+      const { saveRemoteFile } = await import('./mobile.js')
+      await saveRemoteFile({ mode: 'remote', base: remoteBase || DEFAULT_API_BASE, token: res.token, user: res.user })
+    } catch {}
+  }
+  return res.user
 }
 // `email` is optional, and sent only when there is one: a server from before the field would
 // otherwise ignore it without a word, which is the same thing.
 export async function passwordRegister(name, password, code, email) {
-  return (await post('/api/register/password', { name, password, code: code || '', ...(email ? { email } : {}) })).user
+  const res = await post('/api/register/password', { name, password, code: code || '', ...(email ? { email } : {}) })
+  if (MOBILE && res?.token) {
+    setRemoteAuth(remoteBase || DEFAULT_API_BASE, res.token)
+    try {
+      const { saveRemoteFile } = await import('./mobile.js')
+      await saveRemoteFile({ mode: 'remote', base: remoteBase || DEFAULT_API_BASE, token: res.token, user: res.user })
+    } catch {}
+  }
+  return res.user
 }
 export async function passwordResetRedeem(name, code, next) {
-  return (await post('/api/login/password-reset', { name, code, next })).user
+  const res = await post('/api/login/password-reset', { name, code, next })
+  if (MOBILE && res?.token) {
+    setRemoteAuth(remoteBase || DEFAULT_API_BASE, res.token)
+    try {
+      const { saveRemoteFile } = await import('./mobile.js')
+      await saveRemoteFile({ mode: 'remote', base: remoteBase || DEFAULT_API_BASE, token: res.token, user: res.user })
+    } catch {}
+  }
+  return res.user
 }
 
 // Google OAuth 2.0 / OIDC & Federated Identities

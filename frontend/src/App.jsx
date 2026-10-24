@@ -160,6 +160,10 @@ function Shell() {
           const urlStr = data.url
           if (urlStr.startsWith('com.apex.fitness://auth/callback')) {
             try {
+              try {
+                const { Browser } = await import('@capacitor/browser')
+                await Browser.close()
+              } catch {}
               const u = new URL(urlStr)
               const token = u.searchParams.get('token')
               const userJson = u.searchParams.get('user')
@@ -173,6 +177,8 @@ function Shell() {
                 if (user) {
                   useStore.getState().setUser(user, { adopt: true })
                   await useStore.getState().adoptProfile(askAddDeviceData)
+                  await useStore.getState().loadConfig().catch(() => {})
+                  await useStore.getState().pullState().catch(() => {})
                   useUI.getState().toast(t('Welcome back, {0}', user.name))
                 }
               }

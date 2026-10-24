@@ -6,6 +6,8 @@ PODS:
     - CapacitorCordova
   - CapacitorApp (7.1.2):
     - Capacitor
+  - CapacitorBrowser (7.0.5):
+    - Capacitor
   - CapacitorCordova (7.6.9)
   - CapacitorFilesystem (7.1.8):
     - Capacitor
@@ -70,6 +72,7 @@ DEPENDENCIES:
   - "AparajitaCapacitorSecureStorage (from `../../node_modules/@aparajita/capacitor-secure-storage`)"
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorApp (from `../../node_modules/@capacitor/app`)"
+  - "CapacitorBrowser (from `../../node_modules/@capacitor/browser`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorFilesystem (from `../../node_modules/@capacitor/filesystem`)"
   - "CapacitorLocalNotifications (from `../../node_modules/@capacitor/local-notifications`)"
@@ -99,6 +102,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorApp:
     :path: "../../node_modules/@capacitor/app"
+  CapacitorBrowser:
+    :path: "../../node_modules/@capacitor/browser"
   CapacitorCordova:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorFilesystem:
@@ -114,6 +119,7 @@ SPEC CHECKSUMS:
   AparajitaCapacitorSecureStorage: 502bff73187cf9d0164459458ccf47ec65d5895a
   Capacitor: 46067d1c8df89760dbed78780d436327d588c726
   CapacitorApp: f01a913211780e0718dae9750442c3e23f96e106
+  CapacitorBrowser: 6d09f59655e89aede71654ef08b98de55cf032b6
   CapacitorCordova: 2080fc0d6bfbc9dcc0e6d88e77fa624190d343ca
   CapacitorFilesystem: c63fc54df41e5a6761785a7f3c49dc696c22e296
   CapacitorLocalNotifications: 71124afe526ac00585314bff34651bd023f86e37
@@ -133,6 +139,6 @@ SPEC CHECKSUMS:
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
 
-PODFILE CHECKSUM: dc4ba7ce291331f444054045143b076b0a29632e
+PODFILE CHECKSUM: 43921870b10eb03e67761a322ae4050e1531eeab
 
 COCOAPODS: 1.17.0

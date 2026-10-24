@@ -45,7 +45,12 @@ export async function initiateGoogleSignIn({ mobile = MOBILE, returnTo = '/' } =
     const res = await getGoogleAuthUrl({ mobile, returnTo })
     if (res?.url) {
       if (mobile) {
-        window.open(res.url, '_system')
+        try {
+          const { Browser } = await import('@capacitor/browser')
+          await Browser.open({ url: res.url, windowName: '_system' })
+        } catch {
+          window.open(res.url, '_system')
+        }
       } else {
         window.location.href = res.url
       }
