@@ -826,6 +826,53 @@ function redirect(res, url, extraHeaders) {
   res.writeHead(302, { Location: url, 'Cache-Control': 'no-store', ...(extraHeaders || {}) });
   res.end();
 }
+function sendMobileAuthResponse(res, deepLinkUrl, intentUrl, clearCookie, user, fallbackUrl) {
+  const safeName = user?.name ? String(user.name).replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'Athlete';
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>APEX Fitness - Sign-In</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #08090d; color: #f0f2f5; text-align: center; padding: 48px 20px; margin: 0; }
+    .card { max-width: 400px; margin: 0 auto; background: #171922; border: 1px solid #262a36; border-radius: 20px; padding: 36px 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h1 { font-size: 22px; margin: 0 0 10px; color: #fff; }
+    p { color: #8a91a0; font-size: 15px; line-height: 1.5; margin: 0 0 24px; }
+    .btn { display: block; width: 100%; box-sizing: border-box; background: #00d26a; color: #000; font-weight: 700; padding: 15px 20px; border-radius: 99px; text-decoration: none; font-size: 16px; margin-bottom: 14px; }
+    .alt-btn { display: block; width: 100%; box-sizing: border-box; background: transparent; color: #8a91a0; border: 1px solid #262a36; font-weight: 600; padding: 13px 20px; border-radius: 99px; text-decoration: none; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">⚡</div>
+    <h1>Welcome, ${safeName}!</h1>
+    <p>Authentication with Google was successful. Opening the APEX Fitness Android app...</p>
+    <a id="btn-open" class="btn" href="${deepLinkUrl}">Open APEX Fitness App</a>
+    <a class="alt-btn" href="${fallbackUrl || 'https://apex-fitness.vercel.app'}">Continue on Web</a>
+  </div>
+  <script>
+    const deepLink = ${JSON.stringify(deepLinkUrl)};
+    const intentUrl = ${JSON.stringify(intentUrl)};
+    try {
+      window.location.href = deepLink;
+      setTimeout(function() {
+        window.location.href = intentUrl;
+      }, 500);
+    } catch (e) {}
+  </script>
+</body>
+</html>`;
+
+  res.writeHead(200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Set-Cookie': clearCookie
+  });
+  res.end(html);
+}
 // A request the caller got wrong. The catch-all at the bottom answers it with this status and
 // message and does not log it: three of the routes below are reachable without a session, and a
 // stack trace per malformed body would let anyone fill the container log with noise that looks
@@ -1958,7 +2005,9 @@ const googleAuthRoutes = {
       audit(req, 'auth.login.ok', { user, msg: 'google' });
       if (isMobile) {
         const token = makeSession(user);
-        return redirect(res, `com.apex.fitness://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(user)))}`, { 'Set-Cookie': clearStateCookie });
+        const deepLinkUrl = `com.apex.fitness://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(user)))}`;
+        const intentUrl = `intent://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(user)))}#Intent;scheme=com.apex.fitness;package=com.apex.fitness;end;`;
+        return sendMobileAuthResponse(res, deepLinkUrl, intentUrl, clearStateCookie, user, `${frontendUrl}/#auth-success`);
       }
       return redirect(res, `${frontendUrl}/#auth-success`, { 'Set-Cookie': [...sessionCookie(user), clearStateCookie] });
     }
@@ -1991,7 +2040,9 @@ const googleAuthRoutes = {
 
       audit(req, 'auth.google.link-required', { user: existingUser, email: claims.email });
       if (isMobile) {
-        return redirect(res, `com.apex.fitness://auth/link?token=${encodeURIComponent(linkingToken)}&email=${encodeURIComponent(claims.email)}&name=${encodeURIComponent(existingUser.name)}`, { 'Set-Cookie': clearStateCookie });
+        const deepLinkUrl = `com.apex.fitness://auth/link?token=${encodeURIComponent(linkingToken)}&email=${encodeURIComponent(claims.email)}&name=${encodeURIComponent(existingUser.name)}`;
+        const intentUrl = `intent://auth/link?token=${encodeURIComponent(linkingToken)}&email=${encodeURIComponent(claims.email)}&name=${encodeURIComponent(existingUser.name)}#Intent;scheme=com.apex.fitness;package=com.apex.fitness;end;`;
+        return sendMobileAuthResponse(res, deepLinkUrl, intentUrl, clearStateCookie, existingUser, `${frontendUrl}/#google-link&token=${encodeURIComponent(linkingToken)}&email=${encodeURIComponent(claims.email)}&name=${encodeURIComponent(existingUser.name)}`);
       }
       return redirect(res, `${frontendUrl}/#google-link&token=${encodeURIComponent(linkingToken)}&email=${encodeURIComponent(claims.email)}&name=${encodeURIComponent(existingUser.name)}`, { 'Set-Cookie': clearStateCookie });
     }
@@ -2038,7 +2089,9 @@ const googleAuthRoutes = {
     audit(req, 'auth.register.ok', { user: newUser, msg: 'google' });
     if (isMobile) {
       const token = makeSession(newUser);
-      return redirect(res, `com.apex.fitness://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(newUser)))}`, { 'Set-Cookie': clearStateCookie });
+      const deepLinkUrl = `com.apex.fitness://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(newUser)))}`;
+      const intentUrl = `intent://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(newUser)))}#Intent;scheme=com.apex.fitness;package=com.apex.fitness;end;`;
+      return sendMobileAuthResponse(res, deepLinkUrl, intentUrl, clearStateCookie, newUser, `${frontendUrl}/#auth-success`);
     }
     return redirect(res, `${frontendUrl}/#auth-success`, { 'Set-Cookie': [...sessionCookie(newUser), clearStateCookie] });
   },

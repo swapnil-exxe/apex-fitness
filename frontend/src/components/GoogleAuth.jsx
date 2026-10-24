@@ -40,16 +40,26 @@ export function GoogleSignInButton({ onClick, disabled, label }) {
   )
 }
 
-export async function initiateGoogleSignIn({ mobile = MOBILE, returnTo = '/' } = {}) {
+export async function initiateGoogleSignIn({ mobile, returnTo = '/' } = {}) {
   try {
-    const res = await getGoogleAuthUrl({ mobile, returnTo })
+    const isMobile = mobile !== undefined
+      ? Boolean(mobile)
+      : Boolean(
+          MOBILE ||
+          (typeof window !== 'undefined' && (
+            window.Capacitor?.isNativePlatform() ||
+            window.location.protocol === 'capacitor:' ||
+            window.location.hostname === 'localhost'
+          ))
+        )
+    const res = await getGoogleAuthUrl({ mobile: isMobile, returnTo })
     if (res?.url) {
-      if (mobile) {
+      if (isMobile) {
         try {
           const { Browser } = await import('@capacitor/browser')
-          await Browser.open({ url: res.url, windowName: '_system' })
+          await Browser.open({ url: res.url })
         } catch {
-          window.open(res.url, '_system')
+          window.location.href = res.url
         }
       } else {
         window.location.href = res.url
@@ -277,6 +287,33 @@ export function GoogleIdentityRow() {
       subtitle={t('Sign in with Google across your devices.')}
       accessory="chevron"
       onClick={() => initiateGoogleSignIn({ returnTo: '/settings/account' })}
+    />
+  )
+}
+
+export function OpenInAppRow() {
+  const user = useStore(s => s.user)
+  if (!user || MOBILE) return null
+
+  const handleOpenApp = async () => {
+    try {
+      const remoteToken = localStorage.getItem('apex_token') || sessionStorage.getItem('apex_token') || ''
+      const deepLink = `com.apex.fitness://auth/callback?token=${encodeURIComponent(remoteToken)}&user=${encodeURIComponent(JSON.stringify(user))}`
+      window.location.href = deepLink
+      useUI.getState().toast(t('Opening APEX Fitness app…'))
+    } catch {
+      useUI.getState().toast(t('Could not open mobile app'))
+    }
+  }
+
+  return (
+    <Row
+      icon="phoneScreen"
+      iconTint="var(--teal)"
+      title={t('Open in Android App')}
+      subtitle={t('Transfer this profile to the APEX Fitness Android app.')}
+      accessory="chevron"
+      onClick={handleOpenApp}
     />
   )
 }

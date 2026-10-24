@@ -43,7 +43,7 @@ import BackupFolderRow, { useBackupFolder, autoBackupSubtitle } from '../compone
 import { ServerSyncSection, KeptChangesRows, leaveServer, connectServer, passkeySignIn } from '../components/ServerSync.jsx'
 import { passwordOn, PasswordRow, openPasswordSignIn, openPasswordRegister } from '../components/PasswordAuth.jsx'
 import { usePasskeys, PasskeysRow, DeviceLinkRow, openDeviceLinkRedeem } from '../components/Passkeys.jsx'
-import { GoogleIdentityRow, initiateGoogleSignIn } from '../components/GoogleAuth.jsx'
+import { GoogleIdentityRow, OpenInAppRow, initiateGoogleSignIn } from '../components/GoogleAuth.jsx'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField, SearchField } from '../components/ui.jsx'
 import { PAGES, ROOT_GROUPS, pageVisible, searchSettings, pageTrail } from './settings-pages.js'
 
@@ -872,6 +872,7 @@ export default function Settings({ page = null, find = null, via = null }) {
             onClick={() => useUI.getState().openSheet(close => <PairSheet close={close} />)} />
           {pwOn && <PasswordRow version={credsV} />}
           {Boolean(config?.google_auth) && <GoogleIdentityRow />}
+          {!MOBILE && <OpenInAppRow />}
           <Row icon="signOut" iconTint="var(--red)" title={t('Sign out')} danger onClick={signOutHere} />
           <Row icon="shield" iconTint="var(--red)" title={t('Sign out everywhere')} subtitle={t('Ends this profile’s sessions on all your devices.')} danger onClick={signOutEverywhere} />
           <AccountIdRow id={user.id} />
