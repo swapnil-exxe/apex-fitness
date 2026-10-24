@@ -197,6 +197,7 @@ function Shell() {
                 const { saveRemoteFile } = await import('./lib/mobile.js')
                 setRemoteAuth(remoteBase, token)
                 await saveRemoteFile({ mode: 'remote', base: remoteBase, token, user })
+                useStore.getState().setPairedServer?.(remoteBase)
                 useStore.setState({ needsMobileOnboarding: false })
                 if (user) {
                   useStore.getState().setUser(user, { adopt: true })

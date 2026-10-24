@@ -1792,6 +1792,10 @@ export const useStore = create((set, get) => {
       await nativePersist(true)   // the file holds this account's copy before anything else can happen
       set({ needsMobileOnboarding: false })
     },
+    setPairedServer(url) {
+      pairedBase = url ? normalizeServerUrl(url) : null
+      setSync({ server: pairedBase })
+    },
     // Leaves remote mode and drops back to local-only, the way signOut does: never with changes
     // the server has not seen, unless `force` keeps them aside first. Same result as signOut;
     // the phone stays paired when that comes back owed and not stashed.
