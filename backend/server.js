@@ -826,7 +826,7 @@ function redirect(res, url, extraHeaders) {
   res.writeHead(302, { Location: url, 'Cache-Control': 'no-store', ...(extraHeaders || {}) });
   res.end();
 }
-function sendMobileAuthResponse(res, deepLinkUrl, intentUrl, clearCookie, user, fallbackUrl) {
+function sendMobileAuthResponse(res, deepLinkUrl, clearCookie, user) {
   const safeName = user?.name ? String(user.name).replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'Athlete';
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -842,41 +842,25 @@ function sendMobileAuthResponse(res, deepLinkUrl, intentUrl, clearCookie, user, 
     h1 { font-size: 22px; margin: 0 0 10px; color: #fff; }
     p { color: #8a91a0; font-size: 15px; line-height: 1.5; margin: 0 0 24px; }
     .btn { display: block; width: 100%; box-sizing: border-box; background: #00d26a; color: #000; font-weight: 700; padding: 15px 20px; border-radius: 99px; text-decoration: none; font-size: 16px; margin-bottom: 14px; }
-    .alt-btn { display: block; width: 100%; box-sizing: border-box; background: transparent; color: #8a91a0; border: 1px solid #262a36; font-weight: 600; padding: 13px 20px; border-radius: 99px; text-decoration: none; font-size: 14px; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="icon">⚡</div>
     <h1>Welcome, ${safeName}!</h1>
-    <p>Authentication with Google was successful. Opening the APEX Fitness Android app...</p>
+    <p>Authentication was successful. Opening the APEX Fitness app...</p>
     <a id="btn-open" class="btn" href="${deepLinkUrl}">Open APEX Fitness App</a>
-    <a class="alt-btn" href="${fallbackUrl || 'https://apex-fitness.vercel.app'}">Continue on Web</a>
   </div>
   <script>
-    const deepLink = ${JSON.stringify(deepLinkUrl)};
-    const intentUrl = ${JSON.stringify(intentUrl)};
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    const btn = document.getElementById('btn-open');
-    if (btn && isAndroid) {
-      btn.addEventListener('click', function(e) {
-        e.preventDefault();
-        window.location.href = intentUrl;
-      });
-    }
     try {
-      if (isAndroid) {
-        window.location.href = intentUrl;
-        setTimeout(function() { window.location.href = deepLink; }, 600);
-      } else {
-        window.location.href = deepLink;
-      }
+      window.location.replace(${JSON.stringify(deepLinkUrl)});
     } catch (e) {}
   </script>
 </body>
 </html>`;
 
-  res.writeHead(200, {
+  res.writeHead(302, {
+    Location: deepLinkUrl,
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',
     'Set-Cookie': clearCookie
@@ -884,16 +868,15 @@ function sendMobileAuthResponse(res, deepLinkUrl, intentUrl, clearCookie, user, 
   res.end(html);
 }
 
-function sendMobileAuthError(res, errorMsg, clearCookie, fallbackUrl) {
+function sendMobileAuthError(res, errorMsg, clearCookie) {
   const safeErr = String(errorMsg || 'Authentication failed').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const deepLinkUrl = `com.apex.fitness://auth/callback?error=${encodeURIComponent(errorMsg || 'unknown')}`;
-  const intentUrl = `intent://auth/callback?error=${encodeURIComponent(errorMsg || 'unknown')}#Intent;scheme=com.apex.fitness;package=com.apex.fitness;end;`;
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>APEX Fitness - Sign-In</title>
+  <title>APEX Fitness - Sign-In Notice</title>
   <style>
     :root { color-scheme: dark; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #08090d; color: #f0f2f5; text-align: center; padding: 48px 20px; margin: 0; }
@@ -902,7 +885,6 @@ function sendMobileAuthError(res, errorMsg, clearCookie, fallbackUrl) {
     h1 { font-size: 22px; margin: 0 0 10px; color: #ff5c5c; }
     p { color: #8a91a0; font-size: 15px; line-height: 1.5; margin: 0 0 24px; }
     .btn { display: block; width: 100%; box-sizing: border-box; background: #ff5c5c; color: #fff; font-weight: 700; padding: 15px 20px; border-radius: 99px; text-decoration: none; font-size: 16px; margin-bottom: 14px; }
-    .alt-btn { display: block; width: 100%; box-sizing: border-box; background: transparent; color: #8a91a0; border: 1px solid #262a36; font-weight: 600; padding: 13px 20px; border-radius: 99px; text-decoration: none; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -911,31 +893,17 @@ function sendMobileAuthError(res, errorMsg, clearCookie, fallbackUrl) {
     <h1>Sign-In Notice</h1>
     <p>${safeErr}</p>
     <a id="btn-open" class="btn" href="${deepLinkUrl}">Return to APEX Fitness App</a>
-    <a class="alt-btn" href="${fallbackUrl || 'https://apex-fitness.vercel.app'}">Return to Web</a>
   </div>
   <script>
-    const deepLink = ${JSON.stringify(deepLinkUrl)};
-    const intentUrl = ${JSON.stringify(intentUrl)};
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    const btn = document.getElementById('btn-open');
-    if (btn && isAndroid) {
-      btn.addEventListener('click', function(e) {
-        e.preventDefault();
-        window.location.href = intentUrl;
-      });
-    }
     try {
-      if (isAndroid) {
-        window.location.href = intentUrl;
-      } else {
-        window.location.href = deepLink;
-      }
+      window.location.replace(${JSON.stringify(deepLinkUrl)});
     } catch (e) {}
   </script>
 </body>
 </html>`;
 
-  res.writeHead(200, {
+  res.writeHead(302, {
+    Location: deepLinkUrl,
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',
     'Set-Cookie': clearCookie
@@ -2017,7 +1985,7 @@ const googleAuthRoutes = {
     if (oauthError) {
       audit(req, 'auth.google.fail', { ok: false, msg: oauthError });
       if (isMobileClient) {
-        return sendMobileAuthError(res, oauthError, clearStateCookie, `${frontendUrl}/#auth-error=${encodeURIComponent(oauthError)}`);
+        return sendMobileAuthError(res, oauthError, clearStateCookie);
       }
       return redirect(res, `${frontendUrl}/#auth-error=${encodeURIComponent(oauthError)}`, { 'Set-Cookie': clearStateCookie });
     }
@@ -2025,7 +1993,7 @@ const googleAuthRoutes = {
     if (!code || !state) {
       audit(req, 'auth.google.fail', { ok: false, msg: 'missing-code-or-state' });
       if (isMobileClient) {
-        return sendMobileAuthError(res, 'Missing authorization code or state parameters.', clearStateCookie, `${frontendUrl}/#auth-error=missing-params`);
+        return sendMobileAuthError(res, 'missing-params', clearStateCookie);
       }
       return redirect(res, `${frontendUrl}/#auth-error=missing-params`, { 'Set-Cookie': clearStateCookie });
     }
@@ -2036,7 +2004,7 @@ const googleAuthRoutes = {
     if (!stateData || stateData.state !== state) {
       audit(req, 'auth.google.fail', { ok: false, msg: 'invalid-state' });
       if (isMobileClient) {
-        return sendMobileAuthError(res, 'Authentication session expired. Please return to the APEX app and sign in again.', clearStateCookie, `${frontendUrl}/#auth-error=invalid-state`);
+        return sendMobileAuthError(res, 'invalid-state', clearStateCookie);
       }
       return redirect(res, `${frontendUrl}/#auth-error=invalid-state`, { 'Set-Cookie': clearStateCookie });
     }
@@ -2051,7 +2019,7 @@ const googleAuthRoutes = {
     } catch (err) {
       audit(req, 'auth.google.fail', { ok: false, msg: 'verification-error', detail: err.message });
       if (isMobileClient) {
-        return sendMobileAuthError(res, 'Google token verification failed: ' + (err.message || 'unknown error'), clearStateCookie, `${frontendUrl}/#auth-error=token-verification-failed`);
+        return sendMobileAuthError(res, 'token-verification-failed', clearStateCookie);
       }
       return redirect(res, `${frontendUrl}/#auth-error=token-verification-failed`, { 'Set-Cookie': clearStateCookie });
     }
@@ -2075,6 +2043,9 @@ const googleAuthRoutes = {
       const user = db.users.find(u => u.id === fedId.userId);
       if (!user || user.disabled) {
         audit(req, 'auth.login.fail', { ok: false, uid: fedId.userId, msg: 'user-disabled' });
+        if (isMobile) {
+          return sendMobileAuthError(res, 'account-disabled', clearStateCookie);
+        }
         return redirect(res, `${frontendUrl}/#auth-error=account-disabled`, { 'Set-Cookie': clearStateCookie });
       }
 
@@ -2089,8 +2060,7 @@ const googleAuthRoutes = {
       if (isMobile) {
         const token = makeSession(user);
         const deepLinkUrl = `com.apex.fitness://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(user)))}`;
-        const intentUrl = `intent://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(user)))}#Intent;scheme=com.apex.fitness;package=com.apex.fitness;end;`;
-        return sendMobileAuthResponse(res, deepLinkUrl, intentUrl, clearStateCookie, user, `${frontendUrl}/#auth-success`);
+        return sendMobileAuthResponse(res, deepLinkUrl, clearStateCookie, user);
       }
       return redirect(res, `${frontendUrl}/#auth-success`, { 'Set-Cookie': [...sessionCookie(user), clearStateCookie] });
     }
@@ -2124,8 +2094,7 @@ const googleAuthRoutes = {
       audit(req, 'auth.google.link-required', { user: existingUser, email: claims.email });
       if (isMobile) {
         const deepLinkUrl = `com.apex.fitness://auth/link?token=${encodeURIComponent(linkingToken)}&email=${encodeURIComponent(claims.email)}&name=${encodeURIComponent(existingUser.name)}`;
-        const intentUrl = `intent://auth/link?token=${encodeURIComponent(linkingToken)}&email=${encodeURIComponent(claims.email)}&name=${encodeURIComponent(existingUser.name)}#Intent;scheme=com.apex.fitness;package=com.apex.fitness;end;`;
-        return sendMobileAuthResponse(res, deepLinkUrl, intentUrl, clearStateCookie, existingUser, `${frontendUrl}/#google-link&token=${encodeURIComponent(linkingToken)}&email=${encodeURIComponent(claims.email)}&name=${encodeURIComponent(existingUser.name)}`);
+        return sendMobileAuthResponse(res, deepLinkUrl, clearStateCookie, existingUser);
       }
       return redirect(res, `${frontendUrl}/#google-link&token=${encodeURIComponent(linkingToken)}&email=${encodeURIComponent(claims.email)}&name=${encodeURIComponent(existingUser.name)}`, { 'Set-Cookie': clearStateCookie });
     }
@@ -2133,6 +2102,9 @@ const googleAuthRoutes = {
     // 3. New User Registration
     if (INVITE_ONLY) {
       audit(req, 'auth.register.fail', { ok: false, msg: 'invite-required', email: claims.email });
+      if (isMobile) {
+        return sendMobileAuthError(res, 'invite-required', clearStateCookie);
+      }
       return redirect(res, `${frontendUrl}/#auth-error=invite-required`, { 'Set-Cookie': clearStateCookie });
     }
 
@@ -2173,8 +2145,7 @@ const googleAuthRoutes = {
     if (isMobile) {
       const token = makeSession(newUser);
       const deepLinkUrl = `com.apex.fitness://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(newUser)))}`;
-      const intentUrl = `intent://auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(publicUser(newUser)))}#Intent;scheme=com.apex.fitness;package=com.apex.fitness;end;`;
-      return sendMobileAuthResponse(res, deepLinkUrl, intentUrl, clearStateCookie, newUser, `${frontendUrl}/#auth-success`);
+      return sendMobileAuthResponse(res, deepLinkUrl, clearStateCookie, newUser);
     }
     return redirect(res, `${frontendUrl}/#auth-success`, { 'Set-Cookie': [...sessionCookie(newUser), clearStateCookie] });
   },

@@ -180,12 +180,24 @@ function Shell() {
               const token = u.searchParams.get('token')
               const userJson = u.searchParams.get('user')
               if (token) {
-                const user = userJson ? JSON.parse(decodeURIComponent(userJson)) : null
+                let user = null
+                if (userJson) {
+                  try {
+                    user = JSON.parse(userJson)
+                  } catch {
+                    try {
+                      user = JSON.parse(decodeURIComponent(userJson))
+                    } catch (e) {
+                      console.error('Failed to parse user JSON', e)
+                    }
+                  }
+                }
                 const remoteBase = useStore.getState().config?.api_base || 'https://apex-fitness-fd32.onrender.com'
                 const { setRemoteAuth } = await import('./lib/api.js')
                 const { saveRemoteFile } = await import('./lib/mobile.js')
                 setRemoteAuth(remoteBase, token)
                 await saveRemoteFile({ mode: 'remote', base: remoteBase, token, user })
+                useStore.setState({ needsMobileOnboarding: false })
                 if (user) {
                   useStore.getState().setUser(user, { adopt: true })
                   await useStore.getState().adoptProfile(askAddDeviceData)
