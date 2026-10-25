@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import {
   isGoogleAuthEnabled, getGoogleConfig, generateAuthUrl,
-  verifyStateCookie, signLinkingChallenge, verifyLinkingChallenge
+  verifyStateCookie, signLinkingChallenge, verifyLinkingChallenge,
+  verifyAuthCode
 } from '../auth-google.js';
 
 test('isGoogleAuthEnabled reflects environment configuration', () => {
@@ -134,4 +135,132 @@ test('signLinkingChallenge and verifyLinkingChallenge enforce HMAC and expiry', 
   const expMac = crypto.createHmac('sha256', secret).update(expiredBody).digest('base64url');
   const expToken = `${Buffer.from(expiredBody).toString('base64url')}.${expMac}`;
   assert.equal(verifyLinkingChallenge(expToken, secret), null);
+});
+
+test('verifyAuthCode successfully exchanges code and validates claims', async () => {
+  const mockClient = {
+    async getToken({ code, codeVerifier, redirect_uri }) {
+      assert.equal(code, 'valid-auth-code');
+      assert.equal(codeVerifier, 'valid-code-verifier');
+      assert.ok(redirect_uri);
+      return { tokens: { id_token: 'valid.id.jwt' } };
+    },
+    async verifyIdToken({ idToken, audience }) {
+      assert.equal(idToken, 'valid.id.jwt');
+      assert.ok(audience);
+      return {
+        getPayload: () => ({
+          sub: 'google-sub-123456',
+          email: 'SWAPNIL15X@GMAIL.COM',
+          email_verified: true,
+          name: 'Swapnil Athlete',
+          picture: 'https://example.com/avatar.jpg'
+        })
+      };
+    }
+  };
+
+  const claims = await verifyAuthCode({
+    code: 'valid-auth-code',
+    codeVerifier: 'valid-code-verifier',
+    origin: 'https://apex-fitness-fd32.onrender.com',
+    oauthClientOverride: mockClient
+  });
+
+  assert.equal(claims.sub, 'google-sub-123456');
+  assert.equal(claims.email, 'swapnil15x@gmail.com');
+  assert.equal(claims.emailVerified, true);
+  assert.equal(claims.name, 'Swapnil Athlete');
+  assert.equal(claims.picture, 'https://example.com/avatar.jpg');
+});
+
+test('verifyAuthCode throws on failed token exchange with detail', async () => {
+  const mockClient = {
+    async getToken() {
+      const err = new Error('invalid_grant');
+      err.response = { data: { error: 'invalid_grant', error_description: 'Code expired or already redeemed' } };
+      throw err;
+    }
+  };
+
+  await assert.rejects(
+    async () => {
+      await verifyAuthCode({
+        code: 'expired-code',
+        codeVerifier: 'verifier',
+        origin: 'https://apex-fitness-fd32.onrender.com',
+        oauthClientOverride: mockClient
+      });
+    },
+    err => {
+      assert.ok(err.message.includes('Code expired or already redeemed'));
+      assert.equal(err.responseData?.error, 'invalid_grant');
+      return true;
+    }
+  );
+});
+
+test('verifyAuthCode throws if no id_token is returned', async () => {
+  const mockClient = {
+    async getToken() {
+      return { tokens: { access_token: 'access-only' } };
+    }
+  };
+
+  await assert.rejects(
+    async () => {
+      await verifyAuthCode({
+        code: 'code',
+        codeVerifier: 'verifier',
+        oauthClientOverride: mockClient
+      });
+    },
+    /No id_token received/
+  );
+});
+
+test('verifyAuthCode throws if ID token verification fails', async () => {
+  const mockClient = {
+    async getToken() {
+      return { tokens: { id_token: 'tampered.jwt' } };
+    },
+    async verifyIdToken() {
+      throw new Error('Token used too late or signature invalid');
+    }
+  };
+
+  await assert.rejects(
+    async () => {
+      await verifyAuthCode({
+        code: 'code',
+        codeVerifier: 'verifier',
+        oauthClientOverride: mockClient
+      });
+    },
+    /Google ID token verification failed/
+  );
+});
+
+test('verifyAuthCode throws if sub claim is missing in payload', async () => {
+  const mockClient = {
+    async getToken() {
+      return { tokens: { id_token: 'jwt' } };
+    },
+    async verifyIdToken() {
+      return {
+        getPayload: () => ({ email: 'test@example.com' })
+      };
+    }
+  };
+
+  await assert.rejects(
+    async () => {
+      await verifyAuthCode({
+        code: 'code',
+        codeVerifier: 'verifier',
+        oauthClientOverride: mockClient
+      });
+    },
+    /missing sub claim/
+  );
 });

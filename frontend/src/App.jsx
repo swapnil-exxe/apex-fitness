@@ -212,6 +212,14 @@ function Shell() {
                 await saveRemoteFile({ mode: 'remote', base: remoteBase, token, user })
                 useStore.getState().setPairedServer?.(remoteBase)
                 useStore.setState({ needsMobileOnboarding: false })
+                if (!user && token) {
+                  try {
+                    const meRes = await (await import('./lib/api.js')).api('/api/me')
+                    user = meRes?.user || meRes
+                  } catch (e) {
+                    console.error('Failed to fetch /api/me after deep link', e)
+                  }
+                }
                 if (user) {
                   useStore.getState().setUser(user, { adopt: true })
                   await useStore.getState().adoptProfile(askAddDeviceData)

@@ -1972,7 +1972,13 @@ const passkeyRoutes = {
 /* ---------- Google OAuth 2.0 / OIDC & Federated Identities ---------- */
 const googleAuthRoutes = {
   'GET /api/auth/google/status': async (req, res) => {
-    json(res, 200, { enabled: isGoogleAuthEnabled() });
+    const cfg = getGoogleConfig(ORIGIN);
+    json(res, 200, {
+      enabled: isGoogleAuthEnabled(),
+      hasClientId: Boolean(cfg.clientId),
+      hasClientSecret: Boolean(cfg.clientSecret),
+      redirectUri: cfg.redirectUri
+    });
   },
 
   'GET /api/auth/google/url': async (req, res) => {
@@ -2049,9 +2055,11 @@ const googleAuthRoutes = {
       claims = await verifyAuthCode({
         code,
         codeVerifier: stateData.codeVerifier,
-        origin: ORIGIN
+        origin: ORIGIN,
+        redirectUriOverride: stateData.redirectUri
       });
     } catch (err) {
+      console.error('[Google OAuth] Token verification failed:', err.message, err.responseData || '');
       audit(req, 'auth.google.fail', { ok: false, msg: 'verification-error', detail: err.message });
       if (isMobile) {
         return sendMobileAuthError(res, 'token-verification-failed', clearStateCookie);

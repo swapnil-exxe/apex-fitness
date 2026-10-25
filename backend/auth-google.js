@@ -1,15 +1,47 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { OAuth2Client } from 'google-auth-library';
+
+function loadEnvFallback() {
+  if (process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_CLIENT_ID) return;
+  const candidates = [
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '../.env')
+  ];
+  for (const envPath of candidates) {
+    try {
+      if (fs.existsSync(envPath)) {
+        const content = fs.readFileSync(envPath, 'utf8');
+        for (const line of content.split('\n')) {
+          const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+          if (match) {
+            const key = match[1];
+            let value = (match[2] || '').trim();
+            if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+            if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
+            if (!process.env[key] && value) {
+              process.env[key] = value.trim();
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+}
+
+loadEnvFallback();
 
 export function isGoogleAuthEnabled() {
   return Boolean(process.env.GOOGLE_CLIENT_ID || process.env.ENABLE_GOOGLE_AUTH === '1' || process.env.GOOGLE_AUTH === '1' || process.env.GOOGLE_AUTH === 'true');
 }
 
 export function getGoogleConfig(origin) {
-  const clientId = process.env.GOOGLE_CLIENT_ID || '';
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
-  const frontendUrl = process.env.FRONTEND_URL || origin || 'http://localhost:5173';
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || (origin ? `${origin}/api/auth/google/callback` : 'http://localhost:3000/api/auth/google/callback');
+  loadEnvFallback();
+  const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+  const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+  const frontendUrl = (process.env.FRONTEND_URL || origin || 'https://apex-fitness.vercel.app').trim();
+  const redirectUri = (process.env.GOOGLE_REDIRECT_URI || (origin ? `${origin}/api/auth/google/callback` : 'https://apex-fitness-fd32.onrender.com/api/auth/google/callback')).trim();
 
   return {
     clientId,
@@ -45,6 +77,7 @@ export function generateAuthUrl({ origin, isMobile = false, returnTo = '/', stat
   const statePayload = {
     nonce,
     codeVerifier,
+    redirectUri: cfg.redirectUri,
     isMobile: Boolean(isMobile),
     returnTo: typeof returnTo === 'string' && returnTo.startsWith('/') ? returnTo : '/',
     exp: Date.now() + 10 * 60 * 1000
@@ -95,21 +128,46 @@ export function verifyStateCookie(cookieValue, stateSecret) {
 
 export async function verifyAuthCode({ code, codeVerifier, origin, redirectUriOverride, oauthClientOverride }) {
   const cfg = getGoogleConfig(origin);
-  const client = oauthClientOverride || createGoogleOAuthClient(origin, redirectUriOverride);
+  const redirectUri = redirectUriOverride || cfg.redirectUri;
+  const client = oauthClientOverride || createGoogleOAuthClient(origin, redirectUri);
 
-  const { tokens } = await client.getToken({
-    code,
-    codeVerifier
-  });
+  let tokens;
+  try {
+    const tokenRes = await client.getToken({
+      code,
+      codeVerifier,
+      redirect_uri: redirectUri
+    });
+    tokens = tokenRes?.tokens || tokenRes;
+  } catch (err) {
+    const msg = err?.response?.data?.error_description || err?.response?.data?.error || err.message;
+    const exchangeErr = new Error(`Google token exchange failed: ${msg}`);
+    exchangeErr.originalError = err;
+    exchangeErr.responseData = err?.response?.data;
+    throw exchangeErr;
+  }
 
   if (!tokens || !tokens.id_token) {
     throw new Error('No id_token received from Google token exchange');
   }
 
-  const ticket = await client.verifyIdToken({
-    idToken: tokens.id_token,
-    audience: cfg.clientId
-  });
+  const validAudiences = Array.from(new Set([
+    cfg.clientId,
+    process.env.GOOGLE_CLIENT_ID
+  ].filter(Boolean)));
+
+  let ticket;
+  try {
+    ticket = await client.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: validAudiences.length === 1 ? validAudiences[0] : validAudiences
+    });
+  } catch (err) {
+    const msg = err?.message || 'invalid token';
+    const verifyErr = new Error(`Google ID token verification failed: ${msg}`);
+    verifyErr.originalError = err;
+    throw verifyErr;
+  }
 
   const payload = ticket.getPayload();
   if (!payload || !payload.sub) {
