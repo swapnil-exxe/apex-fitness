@@ -17,6 +17,7 @@ function loadEnvFallback() {
           const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
           if (match) {
             const key = match[1];
+            if (!key.startsWith('GOOGLE_')) continue;
             let value = (match[2] || '').trim();
             if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
             if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);

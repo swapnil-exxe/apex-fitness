@@ -487,3 +487,18 @@ export async function unlinkGoogleIdentity() {
   return api('/api/account/identities/google', { method: 'DELETE' })
 }
 
+export async function updateDisplayName(name) {
+  const res = await post('/api/account/name', { name })
+  if (MOBILE && res?.user) {
+    try {
+      const { readRemoteFile, saveRemoteFile } = await import('./mobile.js')
+      const current = await readRemoteFile()
+      if (current && current.mode === 'remote') {
+        await saveRemoteFile({ ...current, user: res.user })
+      }
+    } catch {}
+  }
+  return res.user
+}
+
+

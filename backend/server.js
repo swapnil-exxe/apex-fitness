@@ -1312,7 +1312,7 @@ function loginTarget(body) {
 }
 const acctKey = u => 'acct:' + u.id;
 const passkeyCount = u => db.creds.filter(c => c.userId === u.id).length;
-const publicUser = u => ({ id: u.id, name: u.name, admin: isAdmin(u) });
+const publicUser = u => ({ id: u.id, name: u.name, admin: isAdmin(u), email: u.email || null });
 const POLICY_ERRORS = {
   'too-short': `the password needs at least ${MIN_LENGTH} characters`,
   'too-long': `the password can have at most ${MAX_LENGTH} characters`,
@@ -2552,7 +2552,33 @@ const routes = {
     if (!s) return json(res, 401, { error: 'not signed in' });
     const { user } = s;
     const renew = s.bearer && s.exp - Date.now() < SESSION_DAYS * 86400000 / 2;
-    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) }, ...(renew ? { token: makeSession(user) } : {}) });
+    json(res, 200, { user: publicUser(user), ...(renew ? { token: makeSession(user) } : {}) });
+  },
+
+  // Set or change display name
+  'POST /api/account/name': async (req, res) => {
+    const s = sessionOf(req);
+    if (!s) return json(res, 401, { error: 'not signed in' });
+    const { user } = s;
+    const body = await readBody(req);
+    const newName = text(body.name).trim().slice(0, 40);
+    if (!newName) return json(res, 400, { error: 'name required', code: 'name-required' });
+    if (newName === user.name) return json(res, 200, { ok: true, user: publicUser(user) });
+    if (nameTaken(newName, user.id)) {
+      return json(res, 409, { error: 'another profile already signs in with this name', code: 'name-taken' });
+    }
+    const oldName = user.name;
+    user.name = newName;
+    saveDb();
+    if (process.env.DATABASE_URL) {
+      try {
+        await dbService.upsertUser(user);
+      } catch (e) {
+        console.error('[PostgreSQL] Update user name error:', e.message);
+      }
+    }
+    audit(req, 'auth.name.change', { user, msg: `${oldName} -> ${newName}` });
+    json(res, 200, { ok: true, user: publicUser(user) });
   },
 
   'POST /api/register/options': async (req, res) => {

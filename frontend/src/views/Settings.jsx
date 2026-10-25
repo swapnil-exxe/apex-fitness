@@ -44,6 +44,7 @@ import { ServerSyncSection, KeptChangesRows, leaveServer, connectServer, passkey
 import { passwordOn, PasswordRow, openPasswordSignIn, openPasswordRegister } from '../components/PasswordAuth.jsx'
 import { usePasskeys, PasskeysRow, DeviceLinkRow, openDeviceLinkRedeem } from '../components/Passkeys.jsx'
 import { GoogleIdentityRow, OpenInAppRow, initiateGoogleSignIn } from '../components/GoogleAuth.jsx'
+import { openEditProfileSheet } from '../components/ProfileSheet.jsx'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField, SearchField } from '../components/ui.jsx'
 import { PAGES, ROOT_GROUPS, pageVisible, searchSettings, pageTrail } from './settings-pages.js'
 
@@ -841,20 +842,47 @@ export default function Settings({ page = null, find = null, via = null }) {
     </>,
 
     account: () => <>
-      {/* The server: which one, which account, how that stands, "Sync now". A paired phone's
-          Admin and Disconnect sit in the same block; a browser's account rows follow in their own. */}
+      {/* Profile Section: Display Name, Google Account, Account ID */}
+      {user && !DEMO && <Section title={t('Profile')}>
+        <Row
+          icon="personCircle"
+          iconTint="var(--acc)"
+          title={t('Display Name')}
+          subtitle={user.email ? t('Signed in as {0}', user.email) : undefined}
+          value={user.name}
+          accessory="chevron"
+          onClick={() => openEditProfileSheet()}
+        />
+        {Boolean(config?.google_auth) && <GoogleIdentityRow />}
+        <AccountIdRow id={user.id} />
+      </Section>}
+
+      {/* The server: which one, which account, how that stands, "Sync now". */}
       {user && !DEMO && <ServerSyncSection>
         {MOBILE && <>
           {user.admin && <Row icon="crown" iconTint="var(--indigo)" title={t('Admin dashboard')} accessory="chevron" onClick={() => nav('/admin')} />}
-          <AccountIdRow id={user.id} />
           <Row icon="signOut" iconTint="var(--red)" title={t('Disconnect')} danger onClick={disconnect} />
         </>}
       </ServerSyncSection>}
 
-      {/* account (demo and mobile builds have nothing to sign in to) */}
-      {!(MOBILE && user) && <Section title={MOBILE ? t('Your data') : DEMO ? t('Demo') : t('Account')}>
+      {/* Security & Access for Web accounts */}
+      {user && !DEMO && !MOBILE && <Section title={t('Security & Devices')}>
+        {user.admin && <Row icon="crown" iconTint="var(--indigo)" title={t('Admin dashboard')} accessory="chevron" onClick={() => nav('/admin')} />}
+        <PasskeysRow state={passkeys.st} changed={credsChanged} />
+        <DeviceLinkRow state={passkeys.st} />
+        <Row icon="qr" iconTint="var(--blue)" title={t('Pair the mobile app')} subtitle={t('Connect the APEX app on your phone to this account.')} accessory="chevron"
+          onClick={() => useUI.getState().openSheet(close => <PairSheet close={close} />)} />
+        {pwOn && <PasswordRow version={credsV} />}
+        <OpenInAppRow />
+        <Row icon="signOut" iconTint="var(--red)" title={t('Sign out')} danger onClick={signOutHere} />
+        <Row icon="shield" iconTint="var(--red)" title={t('Sign out everywhere')} subtitle={t('Ends this profile’s sessions on all your devices.')} danger onClick={signOutEverywhere} />
+      </Section>}
+
+      {/* Account (demo and unauthenticated mobile/web) */}
+      {!user && <Section title={MOBILE ? t('Your data') : DEMO ? t('Demo') : t('Account')}>
         {MOBILE ? <>
           <Row icon="lock" iconTint="var(--acc)" title={t('All data stays on this phone')} subtitle={t('No account, no cloud. Back it up anytime in Data & backup.')} />
+          {Boolean(config?.google_auth) && <Row icon="globe" iconTint="var(--blue)" title={t('Continue with Google')} subtitle={t('Sync your workouts across devices with Google')} accessory="chevron" onClick={() => initiateGoogleSignIn()} />}
           <Row icon="cloud" iconTint="var(--indigo)" title={t('Connect to my server')} subtitle={t('Sync this device to your own self-hosted APEX server instead.')} accessory="chevron"
             onClick={connectServer} />
           <KeptChangesRows />
@@ -864,18 +892,6 @@ export default function Settings({ page = null, find = null, via = null }) {
             onClick={() => confirmSheet({ title: t('Reset demo data?'), message: t('Puts the example plan, workouts and weigh-ins back the way they started.'), confirmText: t('Reset'), onConfirm: () => { resetDemo(); nav('/home'); toast(t('Demo data reset')) } })} />
           <Row icon="rocket" iconTint="var(--indigo)" title={t('Self-host APEX')} subtitle={t('Passkey sign-in, sync across your devices, your own data.')} accessory="chevron"
             onClick={() => window.open(REPO, '_blank', 'noopener')} />
-        </> : user ? <>
-          {user.admin && <Row icon="crown" iconTint="var(--indigo)" title={t('Admin dashboard')} accessory="chevron" onClick={() => nav('/admin')} />}
-          <PasskeysRow state={passkeys.st} changed={credsChanged} />
-          <DeviceLinkRow state={passkeys.st} />
-          <Row icon="qr" iconTint="var(--blue)" title={t('Pair the mobile app')} subtitle={t('Connect the APEX app on your phone to this account.')} accessory="chevron"
-            onClick={() => useUI.getState().openSheet(close => <PairSheet close={close} />)} />
-          {pwOn && <PasswordRow version={credsV} />}
-          {Boolean(config?.google_auth) && <GoogleIdentityRow />}
-          {!MOBILE && <OpenInAppRow />}
-          <Row icon="signOut" iconTint="var(--red)" title={t('Sign out')} danger onClick={signOutHere} />
-          <Row icon="shield" iconTint="var(--red)" title={t('Sign out everywhere')} subtitle={t('Ends this profile’s sessions on all your devices.')} danger onClick={signOutEverywhere} />
-          <AccountIdRow id={user.id} />
         </> : webauthnOK() ? <>
           <Row icon="plusCircle" iconTint="var(--acc)" title={t('Create passkey profile')} subtitle={t('Keeps your data safe and separate per person.')} accessory="chevron" onClick={registerHere} />
           <Row icon="fingerprint" iconTint="var(--blue)" title={t('Sign in with passkey')} accessory="chevron" onClick={passkeySignIn} />
@@ -935,7 +951,7 @@ function SettingsRoot({ ctx, preview, open, user, sync, home, go }) {
   const acct = DEMO ? { title: t('Demo'), sub: t('Example data, only in this browser.') }
     : user ? {
       title: user.name || t('Account'),
-      sub: sync && sync.status && sync.status !== 'ok' ? t('Sync needs a look') : MOBILE ? t('Synced with your server') : t('Account, devices and sync'),
+      sub: sync && sync.status && sync.status !== 'ok' ? t('Sync needs a look') : user.email || (MOBILE ? t('Synced with your server') : t('Account, devices and sync')),
     }
     : MOBILE ? { title: t('This phone'), sub: t('All data stays on this phone') }
     : { title: t('Guest'), sub: t('Your data lives on this device. Sign in to sync.') }

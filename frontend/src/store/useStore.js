@@ -1577,6 +1577,16 @@ export const useStore = create((set, get) => {
       setSync({ held: adoptHold })
     },
 
+    setDisplayName(name) {
+      const current = get().user
+      if (!current) return
+      const updated = { ...current, name }
+      try { localStorage.setItem('gym_user', JSON.stringify(updated)) } catch {}
+      try { localStorage.setItem('gym_owner_name', name) } catch {}
+      set({ user: updated })
+      if (MOBILE) nativePersist(true)
+    },
+
     // One PUT at a time: a push asked for while one is in flight runs after it (once, however
     // many asked), and the promise returned covers that follow-up too, so a caller that awaits
     // before signing out knows the last change is on the server.
