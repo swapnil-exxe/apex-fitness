@@ -38,8 +38,13 @@ export function isGoogleAuthEnabled() {
 
 export function getGoogleConfig(origin) {
   loadEnvFallback();
-  const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
-  const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+  let clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+  let clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+  if (clientSecret.startsWith('"') && clientSecret.endsWith('"')) clientSecret = clientSecret.slice(1, -1).trim();
+  if (clientSecret.startsWith("'") && clientSecret.endsWith("'")) clientSecret = clientSecret.slice(1, -1).trim();
+  if (clientId.startsWith('"') && clientId.endsWith('"')) clientId = clientId.slice(1, -1).trim();
+  if (clientId.startsWith("'") && clientId.endsWith("'")) clientId = clientId.slice(1, -1).trim();
+
   const frontendUrl = (process.env.FRONTEND_URL || origin || 'https://apex-fitness.vercel.app').trim();
   const redirectUri = (process.env.GOOGLE_REDIRECT_URI || (origin ? `${origin}/api/auth/google/callback` : 'https://apex-fitness-fd32.onrender.com/api/auth/google/callback')).trim();
 

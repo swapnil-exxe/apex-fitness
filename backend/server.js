@@ -1970,14 +1970,19 @@ const passkeyRoutes = {
 };
 
 /* ---------- Google OAuth 2.0 / OIDC & Federated Identities ---------- */
+let lastGoogleAuthError = null;
+
 const googleAuthRoutes = {
   'GET /api/auth/google/status': async (req, res) => {
     const cfg = getGoogleConfig(ORIGIN);
     json(res, 200, {
       enabled: isGoogleAuthEnabled(),
       hasClientId: Boolean(cfg.clientId),
-      hasClientSecret: Boolean(cfg.clientSecret),
-      redirectUri: cfg.redirectUri
+      clientIdPrefix: cfg.clientId ? cfg.clientId.slice(0, 16) + '...' : null,
+      clientSecretLen: cfg.clientSecret ? cfg.clientSecret.length : 0,
+      clientSecretPrefix: cfg.clientSecret ? cfg.clientSecret.slice(0, 6) + '...' : null,
+      redirectUri: cfg.redirectUri,
+      lastError: lastGoogleAuthError
     });
   },
 
@@ -2059,12 +2064,19 @@ const googleAuthRoutes = {
         redirectUriOverride: stateData.redirectUri
       });
     } catch (err) {
+      const errorDetail = err?.responseData?.error_description || err?.responseData?.error || err.message || 'token-verification-failed';
+      lastGoogleAuthError = {
+        ts: new Date().toISOString(),
+        message: err.message,
+        error: err?.responseData?.error || null,
+        description: err?.responseData?.error_description || null
+      };
       console.error('[Google OAuth] Token verification failed:', err.message, err.responseData || '');
       audit(req, 'auth.google.fail', { ok: false, msg: 'verification-error', detail: err.message });
       if (isMobile) {
-        return sendMobileAuthError(res, 'token-verification-failed', clearStateCookie);
+        return sendMobileAuthError(res, errorDetail, clearStateCookie);
       }
-      return redirect(res, `${frontendUrl}/#auth-error=token-verification-failed`, { 'Set-Cookie': clearStateCookie });
+      return redirect(res, `${frontendUrl}/#auth-error=${encodeURIComponent(errorDetail)}`, { 'Set-Cookie': clearStateCookie });
     }
 
     // 1. Existing Google Identity match
