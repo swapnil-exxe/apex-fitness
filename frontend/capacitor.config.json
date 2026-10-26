@@ -3,6 +3,12 @@
   "appName": "APEX Fitness",
   "webDir": "dist",
   "backgroundColor": "#08090d",
+  "ios": {
+    "contentInset": "always",
+    "preferredContentMode": "mobile",
+    "allowsLinkPreview": false,
+    "scrollEnabled": true
+  },
   "android": {
     "allowMixedContent": true
   }

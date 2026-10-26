@@ -863,7 +863,7 @@ function sendMobileAuthResponse(res, deepLinkUrl, clearCookie, user) {
     <div class="icon">⚡</div>
     <h1>Welcome, ${safeName}!</h1>
     <p>Authentication was successful. Opening the APEX Fitness app...</p>
-    <a id="btn-open" class="btn" href="${intentUrl}">🚀 Open APEX Fitness App</a>
+    <a id="btn-open" class="btn" href="${deepLinkUrl}">🚀 Open APEX Fitness App</a>
     <a class="alt-btn" href="${deepLinkUrl}">Alternative: Tap here if app didn't open</a>
   </div>
   <script>
@@ -872,8 +872,12 @@ function sendMobileAuthResponse(res, deepLinkUrl, clearCookie, user) {
     function launch() {
       try {
         if (/Android/i.test(navigator.userAgent)) {
+          const btn = document.getElementById('btn-open');
+          if (btn) btn.href = intentUrl;
           window.location.href = intentUrl;
         } else {
+          const btn = document.getElementById('btn-open');
+          if (btn) btn.href = deepLinkUrl;
           window.location.href = deepLinkUrl;
         }
       } catch (e) {}
@@ -916,7 +920,7 @@ function sendMobileAuthError(res, errorMsg, clearCookie) {
     <div class="icon">⚠️</div>
     <h1>Sign-In Notice</h1>
     <p>${safeErr}</p>
-    <a id="btn-open" class="btn" href="${intentUrl}">Return to APEX Fitness App</a>
+    <a id="btn-open" class="btn" href="${deepLinkUrl}">Return to APEX Fitness App</a>
   </div>
   <script>
     const intentUrl = ${JSON.stringify(intentUrl)};
@@ -924,8 +928,12 @@ function sendMobileAuthError(res, errorMsg, clearCookie) {
     function launch() {
       try {
         if (/Android/i.test(navigator.userAgent)) {
+          const btn = document.getElementById('btn-open');
+          if (btn) btn.href = intentUrl;
           window.location.href = intentUrl;
         } else {
+          const btn = document.getElementById('btn-open');
+          if (btn) btn.href = deepLinkUrl;
           window.location.href = deepLinkUrl;
         }
       } catch (e) {}
