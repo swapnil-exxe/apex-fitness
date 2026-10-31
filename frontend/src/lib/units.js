@@ -7,9 +7,10 @@ import { workoutVolume } from './history.js'
 import { EXIDX } from './exercises.js'
 import { defaultBarWeight } from './bar.js'
 
-const LB_PER_KG = 2.2046226218
+export const LB_PER_KG = 2.2046226218
+export const KG_PER_LB = 0.45359237
 
-const normUnit = u => (u === 'lbs' ? 'lb' : u)
+export const normUnit = u => (u === 'lbs' || u === 'lb' ? 'lb' : 'kg')
 
 export function convertWeight(value, from, to) {
   const f = normUnit(from)
@@ -18,6 +19,34 @@ export function convertWeight(value, from, to) {
   const v = Number(value)
   if (t === 'lb') return Math.round(v * LB_PER_KG * 2) / 2
   return Math.round(v / LB_PER_KG * 4) / 4
+}
+
+/** Precise conversion without gym-plate rounding (e.g. 70 kg -> 154.32 lb) */
+export function convertWeightPrecise(value, from, to) {
+  const f = normUnit(from)
+  const t = normUnit(to)
+  if (f === t || value == null || value === '' || !Number.isFinite(Number(value))) return value
+  const v = Number(value)
+  if (t === 'lb') return Math.round(v * LB_PER_KG * 100) / 100
+  return Math.round(v * KG_PER_LB * 100) / 100
+}
+
+/** Normalize any weight value to standard kilograms for comparison and PR checking */
+export function toNormalizedKg(value, unit) {
+  const u = normUnit(unit || 'kg')
+  if (value == null || value === '' || !Number.isFinite(Number(value))) return 0
+  const v = Number(value)
+  if (u === 'lb') return v * KG_PER_LB
+  return v
+}
+
+/** Convert a normalized kilogram weight into target unit */
+export function fromNormalizedKg(valueKg, targetUnit) {
+  const t = normUnit(targetUnit || 'kg')
+  if (valueKg == null || valueKg === '' || !Number.isFinite(Number(valueKg))) return 0
+  const v = Number(valueKg)
+  if (t === 'lb') return Math.round(v * LB_PER_KG * 2) / 2
+  return Math.round(v * 4) / 4
 }
 
 // Body weight is not loaded on a bar: the weigh-in sheet steps and stores it at 0.1, so plate

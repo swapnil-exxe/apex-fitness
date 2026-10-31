@@ -33,6 +33,7 @@ import { exerciseMuscleSnapshot, loadOfWorkouts, MUSCLES, MUSCLE_NAME, muscleWei
 import { parseImport, mergeImport } from './lib/import-csv.js'
 import { importHevyData, HevyApiError, HEVY_DEV_SETTINGS, mergeHevyRoutines } from './lib/import-hevy.js'
 import { buildPlanBundle, parsePlan, mergePlan, printPlan, planPrintHTML } from './lib/plan-share.js'
+import { buildProgramExport, exportPlanToCSV, exportPlanToXLSX, parseCSVToRows, parseXLSXToRows, parseTabularToPlan, mergeImportedProgram } from './lib/plan-import-export.js'
 import { estimate1RM, best1RM, is1RMRecord, REP_CAP, formulaOf, FORMULA_NAMES } from './lib/onerm.js'
 import { exerciseHistory } from './lib/exercise-history.js'
 import { isBellEx, dbLoadOf, dbLoadFor, withDbLoad, withMeaning, historyAs, entryDbLoad, currentDbLoad, isOneArm, ownedWeightsFor, dumbbellsOf, ownsDumbbells, withDumbbells, presetWeights, cleanWeights } from './lib/dumbbells.js'
@@ -2127,9 +2128,37 @@ export const planToolsSheet = () => ui().openSheet(close => <PlanTools close={cl
 
 // The three things the Plan menu and this sheet both do with a plan, so the two can never drift.
 export const planHasRoutines = st => (st.routines || []).some(r => r.ex && r.ex.length)
-export async function exportPlanFile() {
+export async function exportPlanFile(format = 'json') {
   const st = S(), user = useStore.getState().user
-  const bundle = buildPlanBundle(st, user?.name ? t('{0}’s plan', user.name) : '')
+  const planName = user?.name ? t('{0}’s plan', user.name) : 'APEX Fitness Plan'
+
+  if (format === 'csv') {
+    const csv = exportPlanToCSV(st, planName)
+    const name = 'apex-plan-' + todayISO() + '.csv'
+    if (MOBILE) { try { await shareExport(csv, name) } catch (e) { /* dismissed */ } return }
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href)
+    toast(t('CSV plan exported.'))
+    return
+  }
+
+  if (format === 'xlsx') {
+    const xlsxBuf = exportPlanToXLSX(st, planName)
+    const name = 'apex-plan-' + todayISO() + '.xlsx'
+    if (MOBILE) {
+      try {
+        const blob = new Blob([xlsxBuf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        await shareExportBlob(blob, name)
+      } catch (e) { /* dismissed */ }
+      return
+    }
+    const blob = new Blob([xlsxBuf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href)
+    toast(t('Excel workbook exported.'))
+    return
+  }
+
+  const bundle = buildProgramExport(st, planName)
   const json = JSON.stringify(bundle, null, 2)
   const name = 'apex-plan-' + todayISO() + '.json'
   if (MOBILE) { try { await shareExport(json, name) } catch (e) { /* dismissed */ } return }
@@ -2147,11 +2176,50 @@ export function printWholePlan() {
 // A picked plan file → the import sheet, or a toast saying why not.
 export function importPlanFile(f, onRead) {
   if (!f) return
+  const ext = (f.name || '').split('.').pop().toLowerCase()
+
+  if (ext === 'xlsx' || ext === 'xls') {
+    const rd = new FileReader()
+    rd.onload = () => {
+      try {
+        const rows = parseXLSXToRows(rd.result)
+        const plan = parseTabularToPlan(rows, S().unit || 'kg')
+        onRead?.()
+        planImportSheet(plan)
+      } catch (e) {
+        toast(t('Couldn’t read that Excel file: {0}', e.message || 'invalid format'))
+      }
+    }
+    rd.readAsArrayBuffer(f)
+    return
+  }
+
+  if (ext === 'csv') {
+    const rd = new FileReader()
+    rd.onload = () => {
+      try {
+        const rows = parseCSVToRows(rd.result)
+        const plan = parseTabularToPlan(rows, S().unit || 'kg')
+        onRead?.()
+        planImportSheet(plan)
+      } catch (e) {
+        toast(t('Couldn’t read that CSV file: {0}', e.message || 'invalid format'))
+      }
+    }
+    rd.readAsText(f)
+    return
+  }
+
   const rd = new FileReader()
   rd.onload = () => {
-    try { const bundle = parsePlan(rd.result, S().unit || 'kg'); onRead?.(); planImportSheet(bundle) }
-    // parsePlan's own refusal is written for people; anything else is not shown raw.
-    catch (e) { toast(e?.code === 'not-plan' ? t('Import failed: {0}', e.message) : t('Couldn’t read that file.')) }
+    try {
+      const parsed = JSON.parse(rd.result)
+      const bundle = parsed.apex_program_version ? parsed : parsePlan(parsed, S().unit || 'kg')
+      onRead?.()
+      planImportSheet(bundle)
+    } catch (e) {
+      toast(e?.code === 'not-plan' ? t('Import failed: {0}', e.message) : t('Couldn’t read that file.'))
+    }
   }
   rd.readAsText(f)
 }
@@ -2161,7 +2229,6 @@ function PlanTools({ close }) {
   const fileRef = useRef(null)
   const hasRoutines = planHasRoutines(st)
 
-  const exportFile = async () => { await exportPlanFile(); close() }
   const pickFile = ev => {
     const f = ev.target.files[0]; ev.target.value = ''
     importPlanFile(f, close)
@@ -2170,15 +2237,19 @@ function PlanTools({ close }) {
   return <>
     <h3>{t('Share your plan')}</h3>
     <div className="muted small" style={{ marginBottom: 16 }}>{t('Send your routines to a friend, or put your week on paper.')}</div>
-    <Button variant="primary" icon="share" onClick={exportFile} disabled={!hasRoutines}>{t('Export plan file')}</Button>
-    <div className="dim small" style={{ margin: '7px 2px 0', lineHeight: 1.4 }}>{t('A small file a friend can import into their own APEX app. Routines only, none of your workouts or weigh-ins.')}</div>
+    <div className="row gap" style={{ gap: 8, marginBottom: 8 }}>
+      <Button variant="primary" icon="share" onClick={async () => { await exportPlanFile('json'); close() }} disabled={!hasRoutines}>{t('JSON Plan')}</Button>
+      <Button variant="tinted" icon="share" onClick={async () => { await exportPlanFile('xlsx'); close() }} disabled={!hasRoutines}>{t('Excel (.xlsx)')}</Button>
+      <Button variant="tinted" icon="share" onClick={async () => { await exportPlanFile('csv'); close() }} disabled={!hasRoutines}>{t('CSV')}</Button>
+    </div>
+    <div className="dim small" style={{ margin: '7px 2px 0', lineHeight: 1.4 }}>{t('Supports full programs, folders, independent KG/LBS units, and exercises.')}</div>
     <div style={{ height: 12 }} />
     <Button variant="tinted" icon="note" onClick={() => { close(); printWholePlan() }} disabled={!hasRoutines}>{t('Print / Save as PDF')}</Button>
     <div className="dim small" style={{ margin: '7px 2px 0', lineHeight: 1.4 }}>{t('A clean printout, one page per plan. No exercise ever gets split across pages.')}</div>
     {!hasRoutines && <div className="dim small" style={{ margin: '12px 2px 0' }}>{t('Add an exercise to a routine first. An empty plan has nothing to share.')}</div>}
     <h4 className="sec">{t('Got a plan from a friend?')}</h4>
-    <Button variant="ghost" icon="download" onClick={() => fileRef.current?.click()}>{t('Import a plan file')}</Button>
-    <input ref={fileRef} type="file" accept="application/json,.json" onChange={pickFile} hidden />
+    <Button variant="ghost" icon="download" onClick={() => fileRef.current?.click()}>{t('Import plan (JSON, Excel, CSV)')}</Button>
+    <input ref={fileRef} type="file" accept=".json,.csv,.xlsx,.xls,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={pickFile} hidden />
   </>
 }
 
@@ -2186,22 +2257,43 @@ export const planImportSheet = bundle => ui().openSheet(close => <PlanImport bun
 
 function PlanImport({ bundle, close }) {
   const [schedule, setSchedule] = useState(false)
+  const [duplicateStrategy, setDuplicateStrategy] = useState('copy')
+
   const apply = () => {
-    update(s => mergePlan(s, bundle, { schedule }))
+    update(s => mergeImportedProgram(s, bundle, { duplicateStrategy, schedule }))
     close()
-    toast(tn('Added {0} routine to your plan', 'Added {0} routines to your plan', bundle.routineCount))
+    toast(tn('Added {0} routine to your plan', 'Added {0} routines to your plan', bundle.routineCount || bundle.routines?.length || 1))
     nav('/plan')
   }
+
+  const rCount = bundle.routineCount || bundle.routines?.length || 0
+  const exCountTotal = bundle.exerciseCount || (bundle.routines || []).reduce((n, r) => n + (r.ex?.length || 0), 0)
+  const fCount = (bundle.folders || []).length
+
   return <>
     <h3>{bundle.name ? t('Import “{0}”', bundle.name) : t('Import this plan')}</h3>
     <div className="muted small" style={{ marginBottom: 14 }}>
-      {routineCount(bundle.routineCount)}
-      {' · ' + exCount(bundle.exerciseCount)}
+      {routineCount(rCount)}
+      {' · ' + exCount(exCountTotal)}
+      {fCount > 0 ? ` · ${fCount} ${t('programs/folders')}` : ''}
       {bundle.scheduledDays > 0
         ? ' · ' + tn('scheduled on {0} day', 'scheduled on {0} days', bundle.scheduledDays)
         : ''}
     </div>
-    <div className="dim small" style={{ marginBottom: 14, lineHeight: 1.4 }}>{t('These are added as new routines. Nothing you already have is touched.')}</div>
+
+    <div style={{ marginBottom: 14 }}>
+      <div className="small dim" style={{ marginBottom: 6 }}>{t('If a routine with the same name already exists:')}</div>
+      <Segmented
+        value={duplicateStrategy}
+        onChange={setDuplicateStrategy}
+        options={[
+          { value: 'copy', label: t('Add as copy') },
+          { value: 'replace', label: t('Replace') },
+          { value: 'skip', label: t('Skip') }
+        ]}
+      />
+    </div>
+
     {bundle.dropped > 0 && <div className="small" style={{ color: 'var(--yellow)', marginBottom: 14, lineHeight: 1.4 }}>
       {t(bundle.dropped === 1
         ? '{0} exercise in the file isn’t in your library and was left out.'

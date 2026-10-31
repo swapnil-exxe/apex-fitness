@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { convertWeight, convertStateUnit } from './units.js'
-import { workoutVolume } from './history.js'
+import { convertWeight, convertStateUnit, convertWeightPrecise, toNormalizedKg, fromNormalizedKg } from './units.js'
+import { workoutVolume, bestWeightFor } from './history.js'
 import { inventoryFor, withPlatePairs } from './plates.js'
 
 describe('convertWeight', () => {
@@ -142,5 +142,59 @@ describe('convertStateUnit: plate inventories', () => {
     const back = convertStateUnit(kg, 'lb')
     expect(back.plates.lb).toEqual(home)
     expect(back.plates.kg).toMatchObject({ 20: 1, _ts: 60 })
+  })
+})
+
+describe('Independent KG/LBS system', () => {
+  it('converts weights precisely without plate snapping', () => {
+    expect(convertWeightPrecise(70, 'kg', 'lb')).toBe(154.32)
+    expect(convertWeightPrecise(154.32, 'lb', 'kg')).toBe(70)
+  })
+
+  it('normalizes to standard KG for accurate comparison', () => {
+    expect(toNormalizedKg(70, 'kg')).toBe(70)
+    expect(toNormalizedKg(100, 'lb')).toBeCloseTo(45.36, 1)
+    expect(fromNormalizedKg(70, 'lb')).toBe(154.5)
+  })
+
+  it('calculates workout volume with mixed KG and LBS exercises normalized', () => {
+    const workout = {
+      unit: 'kg',
+      entries: [
+        { id: '0025', unit: 'kg', sets: [{ w: 100, r: 10, done: true }] }, // 1000 kg
+        { id: '0026', unit: 'lb', sets: [{ w: 100, r: 10, done: true }] }, // 1000 lb ≈ 453.59 kg
+      ],
+    }
+    const volKg = workoutVolume(workout, 'kg')
+    expect(volKg).toBeCloseTo(1453.59, 0)
+  })
+
+  it('evaluates bestWeightFor accurately across mixed KG and LBS entries', () => {
+    const BENCH = '0025'
+    const state = {
+      unit: 'kg',
+      workouts: [
+        {
+          d: '2026-10-01',
+          entries: [{ id: BENCH, unit: 'lb', sets: [{ w: 100, r: 5, done: true }] }], // 100 lb = 45.36 kg
+        },
+        {
+          d: '2026-10-02',
+          entries: [{ id: BENCH, unit: 'kg', sets: [{ w: 70, r: 5, done: true }] }], // 70 kg > 100 lb
+        },
+      ],
+    }
+    // In KG, 70 kg should beat 100 lb
+    expect(bestWeightFor(state, BENCH, null, 'kg')).toBe(70)
+    // In LBS, 70 kg should convert to 154.5 lb
+    expect(bestWeightFor(state, BENCH, null, 'lb')).toBe(154.5)
+
+    // A heavier LB set should beat the 70 KG set
+    state.workouts.push({
+      d: '2026-10-03',
+      entries: [{ id: BENCH, unit: 'lb', sets: [{ w: 200, r: 5, done: true }] }], // 200 lb ≈ 90.7 kg > 70 kg
+    })
+    expect(bestWeightFor(state, BENCH, null, 'kg')).toBeCloseTo(90.75, 0)
+    expect(bestWeightFor(state, BENCH, null, 'lb')).toBe(200)
   })
 })

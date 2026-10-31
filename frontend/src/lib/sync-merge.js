@@ -75,6 +75,7 @@
  */
 import { beatsWeight } from './exercises.js'
 import { bestWeightForEntry } from './history.js'
+import { ensureFolders } from './folders.js'
 import { convertStateUnit, convertBodyWeight } from './units.js'
 import { sanitizeAccent } from './accent.js'
 import { readDayNote as readNote } from './day-notes.js'
@@ -401,6 +402,7 @@ const bodyweightKey = e => `${e?.d}|${e?.t ?? ''}`
 const RESET_LISTS = {
   workouts: workoutKey, routines: x => x?.id, customEx: x => x?.id, bodyweight: bodyweightKey,
   measurements: bodyweightKey, gymCards: x => x?.id, equipProfiles: x => x?.id, favEx: x => x,
+  folders: x => x?.id,
 }
 const RESET_MAPS = ['exNotes', 'barWeights', ...STAMPED_MAPS]
 /** An entry's name in resetIds: a workout's id (or day and start), a weigh-in's day and time, … */
@@ -498,6 +500,7 @@ export function sinceReset(S, at, ids) {
 const DEL_LISTS = {
   workouts: workoutKey, routines: x => x?.id, customEx: x => x?.id, bodyweight: e => e?.d,
   measurements: e => e?.d, gymCards: x => x?.id, equipProfiles: x => x?.id, favEx: x => x,
+  folders: x => x?.id,
 }
 // When an entry was last edited, to hold against a removal. Entries with no time of their own
 // (favourites, and cards and profiles saved before they were stamped) count as older than any
@@ -506,6 +509,7 @@ const DEL_TIME = {
   workouts: workoutTime, routines: x => Number(x?._ts) || 0, customEx: x => Number(x?._ts) || 0,
   bodyweight: e => Number(e?.t) || 0, measurements: e => Number(e?.t) || 0,
   gymCards: x => Number(x?._ts) || 0, equipProfiles: x => Number(x?._ts) || 0,
+  folders: x => Number(x?._ts) || 0,
 }
 // Per field, the most stamps kept; past it the oldest go first.
 export const DELETED_MAX = 5000
@@ -611,7 +615,7 @@ function applyDeletions(S, deleted) {
 // merge of their own are not stamped here; a field nobody stamped follows the newer copy, as before.
 const OWN_MERGE = new Set([
   '_ts', '_rev', '_wid', '_wids', '_unstamped', '_prior', 'active', 'unit', 'unitSet', 'resetAt', 'resetIds', 'deleted', 'edited', 'undone', 'routineOrder',
-  'workouts', 'routines', 'customEx', 'equipProfiles', 'gymCards', 'bodyweight', 'measurements', 'favEx',
+  'workouts', 'routines', 'customEx', 'equipProfiles', 'gymCards', 'bodyweight', 'measurements', 'favEx', 'folders',
   'exWeights', 'balanceOverrides', 'loadKind', 'plates', 'dbLoad', 'dumbbells', 'dayNotes',
 ])
 // Stamped per key instead of whole: one day of the plan, one exercise's note or bar.
@@ -790,7 +794,7 @@ export function mergeStates(a0, b0, { prefer } = {}) {
     }
   }
   out.workouts.sort(byDayStart)
-  for (const f of ['routines', 'customEx', 'equipProfiles', 'gymCards']) {
+  for (const f of ['routines', 'customEx', 'equipProfiles', 'gymCards', 'folders']) {
     if (list(n[f]).length || list(o[f]).length) out[f] = (f === 'routines' ? unionByNeighbours : unionById)(n[f], o[f]).map(clone)
   }
   // The routines in the order chosen last (`edited.routineOrder`), the newer copy's without a
@@ -808,7 +812,7 @@ export function mergeStates(a0, b0, { prefer } = {}) {
   // are both kept. The same for a custom exercise (a photo added on one device survives a rename
   // on the other), an equipment profile and a gym card.
   if (!prefer) {
-    for (const f of ['routines', 'customEx', 'equipProfiles', 'gymCards']) {
+    for (const f of ['routines', 'customEx', 'equipProfiles', 'gymCards', 'folders']) {
       if (!out[f]) continue
       const other = new Map(list(o[f]).filter(x => x?.id != null).map(x => [x.id, x]))
       out[f] = out[f].map(x => {
@@ -879,6 +883,11 @@ export function mergeStates(a0, b0, { prefer } = {}) {
   delete out._prior
   // The accent fields end up in CSS: whatever either copy brought, only a clean value goes on.
   sanitizeAccent(out)
+  if (Array.isArray(out.routines) && out.routines.length > 0) {
+    const safe = ensureFolders(out)
+    out.folders = safe.folders
+    out.activeFolderId = safe.activeFolderId
+  }
   return out
 }
 

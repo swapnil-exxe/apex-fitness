@@ -1,5 +1,6 @@
 // Focused workout semantics shared by session, history, and strength views.
 // Legacy records have no explicit phase or mode, so the defaults preserve main's work/reps shape.
+import { convertWeight, convertWeightPrecise, normUnit } from './units.js'
 
 const MODES = ['reps', 'time', 'cardio']
 const objectOf = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {}
@@ -74,16 +75,24 @@ export function clustersOf(set) {
  * `clusters` is only how that total breaks down — not extra volume on top of it. Adding
  * `clustersOf(set)` here as well would double-count the same reps twice.
  */
-export function extraVolumeOf(set) {
+export function extraVolumeOf(set, targetUnit) {
   const source = objectOf(set)
+  const setUnit = source.unit
+  const convW = (w, u) => {
+    const fromU = u || setUnit
+    if (targetUnit && fromU && normUnit(fromU) !== normUnit(targetUnit)) {
+      return convertWeightPrecise(w, fromU, targetUnit)
+    }
+    return Number(w) || 0
+  }
   // A per-side set carries its drops on each side (issue #60), so the extra volume is the sum of
   // both sides' drops — the row itself has no `drops`. dropsOf reads a side's own {type,drops}.
   if (isSideSet(source)) {
     return [source.sides.L, source.sides.R].reduce(
-      (v, side) => v + dropsOf(side).reduce((n, d) => n + (Number(d?.w) || 0) * (Number(d?.r) || 0), 0), 0)
+      (v, side) => v + dropsOf(side).reduce((n, d) => n + convW(d?.w, d?.unit) * (Number(d?.r) || 0), 0), 0)
   }
   const drops = dropsOf(source)
-  return drops.reduce((v, d) => v + (Number(d?.w) || 0) * (Number(d?.r) || 0), 0)
+  return drops.reduce((v, d) => v + convW(d?.w, d?.unit) * (Number(d?.r) || 0), 0)
 }
 
 /** Append a weight drop to a row, marking it a drop-set. */

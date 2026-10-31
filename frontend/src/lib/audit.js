@@ -34,6 +34,7 @@ const LABELS = {
   'auth.password.change': 'Changed their password',
   'auth.password.remove': 'Removed their password',
   'auth.password.reset': 'Used a reset code',
+  'auth.name.change': 'Changed profile name',
   // The e-mail a profile may sign in with instead of its name. `msg` is the proof it was set with
   // and the address masked to two characters ("password · a…@e…") — never the address itself.
   'auth.email.set': 'Added a sign-in e-mail',
@@ -105,6 +106,7 @@ const REASONS = {
   'invite-required': 'registration requires an invite code',
   'user-disabled': 'the account has been disabled',
   'bad-passkey': 'the passkey could not be verified',
+  'google-auto-linked': 'Google account linked automatically',
   'google': 'Google Sign-In',
   // What an `auth.throttled` pause was for.
   'password': 'wrong passwords or reset codes',

@@ -33,6 +33,7 @@ import Elapsed from '../components/Elapsed.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button, Check, NumberField } from '../components/ui.jsx'
 import { defaultIncrement, weightIncrement, stepWeight } from '../lib/progression.js'
+import { convertWeight } from '../lib/units.js'
 import { progressionGuidance } from '../lib/progression-copy.js'
 import { buildPlannedEntry, plannedConfigOf, builtOutOfProgression } from '../lib/session-start.js'
 import { routineChangesFromEntry, updateRoutineFromEntry } from '../lib/routines.js'
@@ -40,7 +41,7 @@ import { sessionNoProg, setSessionNoProg, setEntryNoProg, joinSessionNoProg } fr
 import { glyphOf } from '../lib/glyphs.js'
 import { markAllSetsDone, sessionHistory } from '../lib/backfill.js'
 import { bestSetFor } from '../lib/exercise-history.js'
-import { isWarmupRow, isFailureSet, toggleFailure, isDropSet, isRestPauseSet, dropsOf, clustersOf, addDrop, addCluster, removeDropAt, removeClusterAt, setDropAt, setClusterAt, nextDropWeight, nextBurstReps, isSideSet, makeSideSet, setSideField, toggleSide, addSideDrop, removeSideDropAt, setSideDropAt, addSideCluster, removeSideClusterAt, setSideClusterAt, WEIGHT_ORIGIN_MANUAL } from '../lib/workout-model.js'
+import { isWarmupRow, isFailureSet, toggleFailure, isDropSet, isRestPauseSet, dropsOf, clustersOf, addDrop, addCluster, removeDropAt, removeClusterAt, setDropAt, setClusterAt, nextDropWeight, nextBurstReps, isSideSet, makeSideSet, setSideField, toggleSide, addSideDrop, removeSideDropAt, setSideDropAt, addSideCluster, removeSideClusterAt, setSideClusterAt, syncSideAggregate, WEIGHT_ORIGIN_MANUAL } from '../lib/workout-model.js'
 import { canMoveActiveWorkoutUnit, moveActiveWorkoutUnit, canMoveActiveWorkoutEntry, moveActiveWorkoutEntry } from '../lib/active-workout-order.js'
 import { nextOpenSet, workoutKeyAction } from '../lib/workout-keys.js'
 import { MUSCLE_NAME } from '../lib/muscles.js'
@@ -266,7 +267,8 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
   // A unilateral exercise logs each side on its own (issue #60): work rows render as an L and an
   // R sub-row, each with its own weight/reps/effort and done tick. Warm-ups stay single.
   const perSide = mode === 'reps' && isPerSide(cfg)
-  const loadStep = mode === 'reps' ? weightIncrement(cfg, S.unit) : 2.5
+  const entryUnit = entry.unit || S.unit || 'kg'
+  const loadStep = mode === 'reps' ? weightIncrement(cfg, entryUnit) : 2.5
   // With the dumbbells you own listed (issue #376), + and − walk from bell to bell — 9, 11, 13 —
   // instead of along the increment's grid; an off-list weight goes to the nearest bell that way.
   const owned = mode === 'reps' ? ownedWeightsFor(S, cfg) : null
@@ -274,8 +276,8 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
   // The weight column says what a dumbbell weight means when the exercise has said (#474): one
   // bell or both together. A one-arm exercise holds one bell, so its plain heading is already true.
   const bells = !bw && bellsIn(cfg) === 2 ? meaning : 'as'
-  const loadCol = { f: 'w', step: loadStep, dec: true, hd: bw ? t('Added ({0})', S.unit)
-    : bells === 'each' ? t('Each ({0})', S.unit) : bells === 'total' ? t('Both ({0})', S.unit) : t('Weight ({0})', S.unit) }
+  const loadCol = { f: 'w', step: loadStep, dec: true, hd: bw ? t('Added ({0})', entryUnit)
+    : bells === 'each' ? t('Each ({0})', entryUnit) : bells === 'total' ? t('Both ({0})', entryUnit) : t('Weight ({0})', entryUnit) }
   // The reps column is the total in every mode, unilateral included — the stepper walks in
   // twos there so the number you land on is one you can actually split evenly.
   const repCol = { f: 'r', step: repStep(cfg), dec: false, hd: t('Reps') }
@@ -691,17 +693,75 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
         <div className="workout-unit-toggle" role="group" aria-label={t('Weight unit')}>
           <button
             type="button"
-            className={'unit-btn' + ((S.unit || 'kg') === 'kg' ? ' active' : '')}
-            onClick={() => useStore.getState().setUnit('kg', { convert: true })}
-            aria-pressed={(S.unit || 'kg') === 'kg'}
+            className={'unit-btn' + (entryUnit === 'kg' ? ' active' : '')}
+            onClick={() => {
+              if (entryUnit === 'kg') return
+              update(s => {
+                const e = s.active?.entries?.[entryIdx]
+                if (!e) return
+                const oldUnit = e.unit || s.unit || 'kg'
+                e.unit = 'kg'
+                if (Array.isArray(e.sets)) {
+                  e.sets.forEach(set => {
+                    set.unit = 'kg'
+                    if (isSideSet(set)) {
+                      if (set.sides.L && set.sides.L.w != null) set.sides.L.w = convertWeight(set.sides.L.w, oldUnit, 'kg')
+                      if (set.sides.R && set.sides.R.w != null) set.sides.R.w = convertWeight(set.sides.R.w, oldUnit, 'kg')
+                      syncSideAggregate(set)
+                    } else if (set.w != null) {
+                      set.w = convertWeight(set.w, oldUnit, 'kg')
+                    }
+                    if (Array.isArray(set.drops)) {
+                      set.drops.forEach(d => {
+                        d.unit = 'kg'
+                        if (d.w != null) d.w = convertWeight(d.w, oldUnit, 'kg')
+                      })
+                    }
+                  })
+                }
+                if (e.target && e.target.weight != null) {
+                  e.target.weight = convertWeight(e.target.weight, oldUnit, 'kg')
+                }
+              })
+            }}
+            aria-pressed={entryUnit === 'kg'}
           >
             KG
           </button>
           <button
             type="button"
-            className={'unit-btn' + (((S.unit || 'kg') === 'lb' || (S.unit || 'kg') === 'lbs') ? ' active' : '')}
-            onClick={() => useStore.getState().setUnit('lb', { convert: true })}
-            aria-pressed={((S.unit || 'kg') === 'lb' || (S.unit || 'kg') === 'lbs')}
+            className={'unit-btn' + ((entryUnit === 'lb' || entryUnit === 'lbs') ? ' active' : '')}
+            onClick={() => {
+              if (entryUnit === 'lb' || entryUnit === 'lbs') return
+              update(s => {
+                const e = s.active?.entries?.[entryIdx]
+                if (!e) return
+                const oldUnit = e.unit || s.unit || 'kg'
+                e.unit = 'lb'
+                if (Array.isArray(e.sets)) {
+                  e.sets.forEach(set => {
+                    set.unit = 'lb'
+                    if (isSideSet(set)) {
+                      if (set.sides.L && set.sides.L.w != null) set.sides.L.w = convertWeight(set.sides.L.w, oldUnit, 'lb')
+                      if (set.sides.R && set.sides.R.w != null) set.sides.R.w = convertWeight(set.sides.R.w, oldUnit, 'lb')
+                      syncSideAggregate(set)
+                    } else if (set.w != null) {
+                      set.w = convertWeight(set.w, oldUnit, 'lb')
+                    }
+                    if (Array.isArray(set.drops)) {
+                      set.drops.forEach(d => {
+                        d.unit = 'lb'
+                        if (d.w != null) d.w = convertWeight(d.w, oldUnit, 'lb')
+                      })
+                    }
+                  })
+                }
+                if (e.target && e.target.weight != null) {
+                  e.target.weight = convertWeight(e.target.weight, oldUnit, 'lb')
+                }
+              })
+            }}
+            aria-pressed={((entryUnit === 'lb' || entryUnit === 'lbs'))}
           >
             LBS
           </button>

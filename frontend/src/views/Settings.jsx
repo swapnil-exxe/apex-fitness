@@ -861,13 +861,15 @@ export default function Settings({ page = null, find = null, via = null }) {
       {user && !DEMO && <ServerSyncSection>
         {MOBILE && <>
           {user.admin && <Row icon="crown" iconTint="var(--indigo)" title={t('Admin dashboard')} accessory="chevron" onClick={() => nav('/admin')} />}
+          <AccountIdRow id={user.id} />
           <Row icon="signOut" iconTint="var(--red)" title={t('Disconnect')} danger onClick={disconnect} />
         </>}
       </ServerSyncSection>}
 
       {/* Security & Access for Web accounts */}
-      {user && !DEMO && !MOBILE && <Section title={t('Security & Devices')}>
+      {user && !DEMO && !MOBILE && <Section title={t('Account')}>
         {user.admin && <Row icon="crown" iconTint="var(--indigo)" title={t('Admin dashboard')} accessory="chevron" onClick={() => nav('/admin')} />}
+        <AccountIdRow id={user.id} />
         <PasskeysRow state={passkeys.st} changed={credsChanged} />
         <DeviceLinkRow state={passkeys.st} />
         <Row icon="qr" iconTint="var(--blue)" title={t('Pair the mobile app')} subtitle={t('Connect the APEX app on your phone to this account.')} accessory="chevron"

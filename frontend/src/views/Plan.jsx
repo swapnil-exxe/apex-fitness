@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { DAYN, DAYS, weekOrder, weekStartOf, uid, exCount, routineCount, todayISO, fmtDate } from '../lib/format.js'
-import { t } from '../lib/i18n.js'
+import { t, tn } from '../lib/i18n.js'
+import { ensureFolders, getFolders, getRoutinesInFolder, createFolder, renameFolder, deleteFolder, addRoutineToFolder, moveRoutineBetweenFolders, toggleFolderCollapsed, setActiveProgram, duplicateFolder } from '../lib/folders.js'
 import {
   dayAssignSheet, starterPlanSheet, confirmSheet, menuSheet,
   planHasRoutines, exportPlanFile, printWholePlan, importPlanFile,
@@ -377,11 +378,41 @@ function Schedule({ S, update, nav, mode }) {
 
 /* ================================ Routines ================================ */
 
+function ProgramEditSheet({ folder, onSave, close }) {
+  const [name, setName] = useState(folder?.name || '')
+  return (
+    <div className="sheet-body" style={{ padding: '4px 0' }}>
+      <h3>{folder ? t('Rename Program') : t('New Workout Program')}</h3>
+      <div className="muted small" style={{ marginBottom: 12 }}>
+        {t('Organize your routines into collections like PPL, Upper/Lower, or custom splits.')}
+      </div>
+      <input
+        className="input"
+        style={{ width: '100%', marginBottom: 16 }}
+        placeholder={t('Program name (e.g. 6-Day PPL)')}
+        value={name}
+        onChange={e => setName(e.target.value)}
+        autoFocus
+      />
+      <div className="row end gap" style={{ gap: 8 }}>
+        <Button variant="ghost" onClick={close}>{t('Cancel')}</Button>
+        <Button variant="primary" disabled={!name.trim()} onClick={() => { onSave(name.trim()); close() }}>{t('Save')}</Button>
+      </div>
+    </div>
+  )
+}
+
 function Routines({ S, update, nav }) {
   const [edit, setEdit] = useState(false)
   const [flash, setFlash] = useState(null)
+  const [search, setSearch] = useState('')
   const swipe = workoutControls(S).swipeSets
-  const routines = S.routines
+
+  const safeS = ensureFolders(S)
+  const folders = safeS.folders || []
+  const activeFolderId = safeS.activeFolderId || folders[0]?.id
+  const routines = S.routines || []
+
   // The order of this list is the order of `S.routines`, and every other screen reads the same
   // array (the Start screen, the day sheets, the routine pickers), so moving a routine here moves
   // it everywhere (#142). Reordering lives behind Edit, like on an iPhone.
@@ -391,11 +422,92 @@ function Routines({ S, update, nav }) {
     s.routines.splice(to, 0, m)
   }))
 
-  const addRoutine = () => {
+  const openNewProgram = () => {
+    useUI.getState().openSheet(close => (
+      <ProgramEditSheet
+        onSave={name => {
+          update(s => {
+            const f = createFolder(s, { name })
+            s.activeFolderId = f.id
+          })
+          useUI.getState().toast(t('Program created'))
+        }}
+        close={close}
+      />
+    ))
+  }
+
+  const openRenameProgram = f => {
+    useUI.getState().openSheet(close => (
+      <ProgramEditSheet
+        folder={f}
+        onSave={name => {
+          update(s => renameFolder(s, f.id, name))
+          useUI.getState().toast(t('Program renamed'))
+        }}
+        close={close}
+      />
+    ))
+  }
+
+  const openProgramMenu = (f, fRoutines) => {
+    const isAct = f.id === activeFolderId
+    menuSheet({
+      title: f.name,
+      subtitle: `${fRoutines.length} ${t('routines')}`,
+      items: [
+        !isAct && {
+          icon: 'check',
+          label: t('Set as Active Program'),
+          onClick: () => {
+            update(s => setActiveProgram(s, f.id))
+            useUI.getState().toast(t('Set as active program'))
+          }
+        },
+        {
+          icon: 'pencil',
+          label: t('Rename Program'),
+          onClick: () => openRenameProgram(f)
+        },
+        {
+          icon: 'copy',
+          label: t('Duplicate Program'),
+          onClick: () => {
+            update(s => duplicateFolder(s, f.id))
+            useUI.getState().toast(t('Program duplicated'))
+          }
+        },
+        folders.length > 1 && {
+          icon: 'trash',
+          label: t('Delete Program'),
+          danger: true,
+          onClick: () => {
+            confirmSheet({
+              title: t('Delete program?'),
+              message: t('Routines inside will be moved to your other program so your workouts are preserved.'),
+              confirmText: t('Delete program'),
+              danger: true,
+              onConfirm: () => {
+                update(s => deleteFolder(s, f.id, { deleteRoutines: false }))
+                useUI.getState().toast(t('Program deleted'))
+              }
+            })
+          }
+        }
+      ].filter(Boolean)
+    })
+  }
+
+  const addRoutine = (targetFolderId = null) => {
     const r = { id: uid(), name: t('New routine'), emoji: DEFAULT_GLYPH, ex: [] }
-    update(s => { s.routines.push(r) })
+    update(s => {
+      s.routines.push(r)
+      const folderId = targetFolderId || s.activeFolderId || s.folders?.[0]?.id
+      if (folderId) addRoutineToFolder(s, folderId, r.id)
+    })
     nav('/plan/r/' + r.id)
   }
+
   // The same delete as RoutineEdit's "Delete routine" button (lib/routines.js), with an Undo in
   // place of its confirm (v1.3.11): the swipe and the edit-mode minus both land here.
   const remove = r => deleteRoutineWithUndo(r.id)
@@ -406,6 +518,8 @@ function Routines({ S, update, nav }) {
     update(s => {
       const at = s.routines.findIndex(x => x.id === r.id)
       s.routines.splice(at < 0 ? s.routines.length : at + 1, 0, copy)
+      const f = (s.folders || []).find(f => (f.routineIds || []).includes(r.id))
+      if (f) addRoutineToFolder(s, f.id, copy.id)
     })
     setFlash({ id: copy.id, n: ++flashSeq })
     // With its own Undo: the toast takes the place of any Undo still showing (one toast at a
@@ -419,13 +533,61 @@ function Routines({ S, update, nav }) {
   const daysOf = id => order.filter(d => [].concat(S.week[d] || []).includes(id)).map(d => t(DAYS[d]))
   const sub = r => [exCount(r.ex.length), daysOf(r.id).join(', ')].filter(Boolean).join(' · ')
 
+  const query = search.trim().toLowerCase()
+  const displayRoutines = query ? routines.filter(r => r.name.toLowerCase().includes(query)) : routines
+
   return <>
     <div className="row between plan-sec-h plan-routines-bar">
       {routines.length > 0
         ? <button className="plan-textbtn" aria-pressed={edit} onClick={() => setEdit(e => !e)}>{edit ? t('Done') : t('Edit')}</button>
         : <span />}
-      <Button size="sm" variant="tinted" icon="plus" onClick={addRoutine}>{t('New routine')}</Button>
+      <div className="row gap" style={{ gap: 6 }}>
+        {routines.length > 0 && <Button size="sm" variant="ghost" icon="folder" onClick={openNewProgram}>{t('+ Program')}</Button>}
+        <Button size="sm" variant="tinted" icon="plus" onClick={() => addRoutine()}>{t('New routine')}</Button>
+      </div>
     </div>
+
+    {routines.length > 3 && (
+      <div style={{ marginBottom: 12 }}>
+        <input
+          className="input"
+          style={{ width: '100%', fontSize: 14 }}
+          placeholder={t('Search routines...')}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </div>
+    )}
+
+    {/* Folder program cards when multiple programs exist */}
+    {folders.length > 1 && !query && (
+      <div className="plan-programs-bar" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 10, marginBottom: 8 }}>
+        {folders.map(f => {
+          const isAct = f.id === activeFolderId
+          const fRoutines = getRoutinesInFolder(S, f.id)
+          return (
+            <div
+              key={f.id}
+              className={'card program-card' + (isAct ? ' active' : '')}
+              style={{
+                minWidth: 160,
+                padding: '10px 12px',
+                border: isAct ? '1.5px solid var(--acc)' : '1px solid var(--sep)',
+                cursor: 'pointer'
+              }}
+              onClick={() => openProgramMenu(f, fRoutines)}
+            >
+              <div className="row between" style={{ marginBottom: 4 }}>
+                <span className="small bold" style={{ color: isAct ? 'var(--acc)' : 'inherit' }}>{f.name}</span>
+                {isAct && <span className="tag nocap" style={{ fontSize: 10 }}>{t('Active')}</span>}
+              </div>
+              <div className="dim small">{fRoutines.length} {t('routines')}</div>
+            </div>
+          )
+        })}
+      </div>
+    )}
+
     {routines.length ? <>
       {edit
         ? <div className="list routine-list plan-routines is-editing" ref={reorder.listRef}>{routines.map((r, i) =>
@@ -436,7 +598,7 @@ function Routines({ S, update, nav }) {
             {routines.length > 1 && <button className="plan-handle" aria-label={t('Move {0}', r.name)} title={t('Drag to reorder')}
               {...reorder.handle(i)}><Icon name="chevronsUpDown" /></button>}
           </div>)}</div>
-        : <div className="list routine-list plan-routines">{routines.map(r => {
+        : <div className="list routine-list plan-routines">{displayRoutines.map(r => {
           const row = <div key={r.id} className="item plan-routine" {...tappable(() => nav('/plan/r/' + r.id))}>
             <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
             <div className="grow"><div className="tt">{r.name}</div><div className="ss">{sub(r)}</div></div>

@@ -5,6 +5,7 @@ import { fmtSpeed } from './speed.js'
 import { hasIncline, inclineFrom } from './incline.js'
 import { isCardio, isBodyweightEq, isAssisted, betterWeight } from './exercises.js'
 import { barWeightFor } from './bar.js'
+import { toNormalizedKg, fromNormalizedKg, normUnit, convertWeight } from './units.js'
 import { phaseForSet, modeForSet, modeForEntry, isWarmupRow, isFailureSet, isDropSet, isRestPauseSet, normalizeMode, completedVolumeOf, hasCompletedWork, nextDropWeight, splitBurstReps, makeSideSet, isSideSet, syncSideAggregate, WEIGHT_ORIGIN_MANUAL, dropsOf, clustersOf } from './workout-model.js'
 import { backoffAt, backoffStepOf, backoffWeights } from './backoff.js'
 import { dbLoadOf, bellsIn, volumeFactor, historyAs, ownedFloor } from './dumbbells.js'
@@ -441,18 +442,38 @@ export function freestyleConfig(S, cfg) {
     sets: Math.max(1, last.sets.length)
   }
 }
-export function bestWeightFor(S, exId, as) {
+export function bestWeightFor(S, exId, as, targetUnit) {
   // `as`: the meaning of a dumbbell weight to compare in (lib/dumbbells.js) — the session's own
   // when a set is judged as a record — so a past "40 total" is the 20 each it was. Without one,
   // every weight counts as logged, as it always did.
   const H = as ? historyAs(S, exId, as) : S
   // 0 means "nothing logged with a load yet" and must not win a min() for an assisted machine.
   let best = 0
-  H.workouts.forEach(w => w.entries.forEach(e => {
+  let bestKg = 0
+  const tUnit = targetUnit ? normUnit(targetUnit) : null
+  const assisted = isAssisted(exId ? { id: exId } : {})
+
+  H.workouts.forEach(w => (w?.entries || []).forEach(e => {
     if (e.id !== exId) return
     const entryBest = bestWeightForEntry(e)
-    if (entryBest > 0) best = best > 0 ? betterWeight(exId, best, entryBest) : entryBest
+    if (entryBest > 0) {
+      const eUnit = normUnit(e.unit || w.unit || 'kg')
+      const entryKg = toNormalizedKg(entryBest, eUnit)
+      if (best <= 0) {
+        best = entryBest
+        bestKg = entryKg
+      } else {
+        const wins = assisted ? entryKg < bestKg : entryKg > bestKg
+        if (wins) {
+          best = entryBest
+          bestKg = entryKg
+        }
+      }
+    }
   }))
+
+  if (best <= 0) return 0
+  if (tUnit) return fromNormalizedKg(bestKg, tUnit)
   return best
 }
 /**
@@ -728,27 +749,26 @@ function shapeRows(sets, cfg, grid) {
   }
   return [warmup, work]
 }
-export function workoutVolume(w) {
+export function workoutVolume(w, targetUnit) {
   let v = 0
-  // Count each completed limb at its own load, including drops. A rest-pause side's r already
-  // includes its bursts. Unchecked limbs and warm-ups contribute no volume.
-  // Warm-ups are excluded here as everywhere else. The config sheet promises it in so many
-  // words ("left out of volume, records and progression") and every other consumer already
-  // does it; this line was the one that did not, which only stopped being harmless when a
-  // routine started planning warm-ups by default. The number is written into the saved
-  // workout, so an inflated one would stay wrong forever.
-  // A per-side row's mirror is `w = max(L, R), r = L + R` (workout-model syncSideAggregate) —
-  // right for a headline, wrong for a product: 14×10 left and 12.5×6 right is 215, not 14×16.
-  // Each side is its own weight × reps, with its own drops and bursts.
-  // A dumbbell entry logged per bell counts both bells (volumeFactor, lib/dumbbells.js); every
-  // other entry, and every one saved before the setting existed, counts its weight once.
+  const workoutTargetUnit = normUnit(targetUnit || w?.unit || 'kg')
   ;(Array.isArray(w?.entries) ? w.entries : []).forEach(e => {
     const f = volumeFactor(e)
+    const eUnit = normUnit(e?.unit || w?.unit || workoutTargetUnit)
     ;(Array.isArray(e?.sets) ? e.sets : []).forEach(s => {
-      if (!isWarmupRow(s)) v += completedVolumeOf(s) * f
+      if (!isWarmupRow(s)) {
+        const sUnit = normUnit(s?.unit || eUnit)
+        const vol = completedVolumeOf(s) * f
+        if (sUnit !== workoutTargetUnit) {
+          const kg = toNormalizedKg(vol, sUnit)
+          v += fromNormalizedKg(kg, workoutTargetUnit)
+        } else {
+          v += vol
+        }
+      }
     })
   })
-  return v
+  return Math.round(v * 100) / 100
 }
 // Finished sessions carry their canonical local calendar day in `d`. Keep it aligned with
 // History/calendar readers, and use the local start timestamp only for older records whose date
