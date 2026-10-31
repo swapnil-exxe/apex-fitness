@@ -4,11 +4,129 @@ import { uid, todayISO } from './format.js'
 import { normUnit } from './units.js'
 import { ensureFolders } from './folders.js'
 import { buildPlanBundle, parsePlan } from './plan-share.js'
+import { matchExercise, matchHevyTitle } from './import-csv.js'
 
-export function findExerciseByName(name) {
+/**
+ * Normalizes and extracts cell values by inspecting candidate column names in priority order,
+ * case-insensitively and stripping whitespace / special characters.
+ */
+export function getRowValue(row, ...candidateKeys) {
+  if (!row || typeof row !== 'object') return ''
+  const rowEntries = Object.entries(row).map(([k, v]) => [k.toLowerCase().replace(/[^a-z0-9]/g, ''), v])
+  for (const targetKey of candidateKeys) {
+    const cleanTarget = targetKey.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const hit = rowEntries.find(([k, v]) => k === cleanTarget && v !== undefined && v !== null && String(v).trim() !== '')
+    if (hit) return String(hit[1]).trim()
+  }
+  return ''
+}
+
+/**
+ * Provides a clean sample workout plan template that users can export, edit in Excel/Google Sheets,
+ * and re-import directly into APEX Fitness.
+ */
+export function getSamplePlanTemplate() {
+  return {
+    unit: 'kg',
+    routines: [
+      {
+        id: 'r_push_sample',
+        name: 'Push Day',
+        emoji: 'chest',
+        ex: [
+          { id: '0025', sets: 4, reps: 8, weight: 80, unit: 'kg', restSec: 120 },
+          { id: '0070', sets: 3, reps: 10, weight: 50, unit: 'kg', restSec: 90 },
+          { id: '0241', sets: 3, reps: 12, weight: 30, unit: 'kg', restSec: 60 }
+        ]
+      },
+      {
+        id: 'r_pull_sample',
+        name: 'Pull Day',
+        emoji: 'back',
+        ex: [
+          { id: '0032', sets: 3, reps: 5, weight: 120, unit: 'kg', restSec: 180 },
+          { id: '2330', sets: 4, reps: 10, weight: 65, unit: 'kg', restSec: 90 },
+          { id: '0294', sets: 3, reps: 12, weight: 16, unit: 'kg', restSec: 60 }
+        ]
+      },
+      {
+        id: 'r_legs_sample',
+        name: 'Legs Day',
+        emoji: 'legs',
+        ex: [
+          { id: '0043', sets: 4, reps: 8, weight: 100, unit: 'kg', restSec: 150 },
+          { id: '0739', sets: 3, reps: 12, weight: 180, unit: 'kg', restSec: 90 },
+          { id: '0585', sets: 3, reps: 15, weight: 50, unit: 'kg', restSec: 60 }
+        ]
+      }
+    ],
+    folders: [
+      {
+        id: 'f_ppl_sample',
+        name: 'Sample 3-Day Program',
+        routineIds: ['r_push_sample', 'r_pull_sample', 'r_legs_sample'],
+        collapsed: false,
+        active: true
+      }
+    ],
+    activeFolderId: 'f_ppl_sample'
+  }
+}
+
+/**
+ * Searches the exercise catalogue and custom exercises using fuzzy matching,
+ * Hevy title resolution, token matching, and exact name matching.
+ */
+export function findExerciseByName(name, customEx = []) {
   if (!name || typeof name !== 'string') return null
-  const q = name.trim().toLowerCase()
-  return CATALOGUE.find(e => (e.name || '').toLowerCase() === q) || null
+  const clean = name.trim()
+  if (!clean) return null
+
+  // 1. Direct ID check
+  if (EXIDX[clean]) return EXIDX[clean]
+  const customHit = (customEx || []).find(c => c && c.id === clean)
+  if (customHit) return customHit
+
+  // 2. High-precision fuzzy matcher from import-csv (word-bags, aliases, equipment qualifiers)
+  const matchedId = matchExercise(clean)
+  if (matchedId && EXIDX[matchedId]) return EXIDX[matchedId]
+
+  // 3. Hevy title map
+  const hevyId = matchHevyTitle(clean)
+  if (hevyId && EXIDX[hevyId]) return EXIDX[hevyId]
+
+  // 4. Exact lowercase match against catalogue (`.n` and `.name`)
+  const q = clean.toLowerCase()
+  const exact = CATALOGUE.find(e => (e.n || e.name || '').toLowerCase() === q)
+  if (exact) return exact
+
+  // 5. Check custom exercises by name
+  const existingCustom = (customEx || []).find(c => (c.n || c.name || '').toLowerCase() === q)
+  if (existingCustom) return existingCustom
+
+  // 6. Token containment: all significant words match
+  const words = q.split(/[\s,()\-+/]+/).filter(w => w.length > 2)
+  if (words.length > 0) {
+    const allWords = CATALOGUE.find(e => {
+      const en = (e.n || e.name || '').toLowerCase()
+      return words.every(w => en.includes(w))
+    })
+    if (allWords) return allWords
+
+    // Fallback: majority of words match
+    let best = null, maxMatches = 0
+    for (const e of CATALOGUE) {
+      const en = (e.n || e.name || '').toLowerCase()
+      const matchCount = words.filter(w => en.includes(w)).length
+      if (matchCount > maxMatches && matchCount >= Math.ceil(words.length * 0.6)) {
+        maxMatches = matchCount
+        best = e
+      }
+    }
+    if (best) return best
+  }
+
+  return null
 }
 
 /**
@@ -63,7 +181,8 @@ export function buildProgramExport(S, programName = '') {
       collapsed: !!f.collapsed,
       active: f.id === safeS.activeFolderId,
       _ts: f._ts || Date.now()
-    }))
+    })),
+    customExercises: (safeS.customEx || []).filter(c => c && c.id)
   }
 }
 
@@ -73,7 +192,6 @@ export function buildProgramExport(S, programName = '') {
 export function planToTabularRows(S, programName = 'APEX Fitness Plan') {
   const safeS = ensureFolders(S)
   const rows = []
-  const folderMap = new Map((safeS.folders || []).map(f => [f.id, f]))
 
   // Find which folder owns each routine
   const routineToFolder = new Map()
@@ -104,8 +222,8 @@ export function planToTabularRows(S, programName = 'APEX Fitness Plan') {
     }
 
     exercises.forEach(e => {
-      const meta = EXIDX[e.id] || {}
-      const exName = e.name || meta.name || e.id
+      const meta = EXIDX[e.id] || (safeS.customEx || []).find(c => c.id === e.id) || {}
+      const exName = e.name || meta.n || meta.name || e.id
       rows.push({
         'Program': programName,
         'Folder': folderName,
@@ -149,7 +267,7 @@ export function exportPlanToCSV(S, programName = 'APEX Fitness Plan') {
 }
 
 /**
- * Generate an XLSX workbook ArrayBuffer from plan state.
+ * Generate an XLSX workbook Uint8Array from plan state.
  */
 export function exportPlanToXLSX(S, programName = 'APEX Fitness Plan') {
   const rows = planToTabularRows(S, programName)
@@ -172,12 +290,12 @@ export function exportPlanToXLSX(S, programName = 'APEX Fitness Plan') {
 }
 
 /**
- * Parses CSV text into normalized rows.
+ * Parses CSV text into normalized rows, skipping any preamble/title lines.
  */
 export function parseCSVToRows(csvText) {
   if (!csvText || typeof csvText !== 'string') return []
   const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0)
-  if (lines.length < 2) return []
+  if (lines.length === 0) return []
 
   const parseLine = line => {
     const entries = []
@@ -203,66 +321,168 @@ export function parseCSVToRows(csvText) {
     return entries
   }
 
-  const headers = parseLine(lines[0])
-  return lines.slice(1).map(line => {
+  // Detect true header line (first line containing at least 2 fitness column keywords)
+  let headerLineIdx = 0
+  const headerKeywords = ['exercise', 'routine', 'workout', 'day', 'set', 'rep', 'weight', 'rest', 'lift', 'movement', 'name']
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    const parsed = parseLine(lines[i])
+    const matchCount = parsed.filter(cell => {
+      const s = String(cell || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+      return s.length > 0 && s.length <= 25 && headerKeywords.some(kw => s === kw || s.startsWith(kw) || s.endsWith(kw))
+    }).length
+    if (matchCount >= 2) {
+      headerLineIdx = i
+      break
+    }
+  }
+
+  const headers = parseLine(lines[headerLineIdx])
+  return lines.slice(headerLineIdx + 1).map(line => {
     const cells = parseLine(line)
     const obj = {}
     headers.forEach((h, idx) => {
-      obj[h] = cells[idx] != null ? cells[idx] : ''
+      if (h) obj[h] = cells[idx] != null ? cells[idx] : ''
     })
     return obj
-  })
+  }).filter(obj => Object.values(obj).some(v => v !== ''))
 }
 
 /**
- * Parses XLSX data (ArrayBuffer or binary string) into tabular rows.
+ * Parses XLSX data (ArrayBuffer, Uint8Array or binary string) into tabular rows.
+ * Reads across all workout sheets and tolerates leading title rows.
  */
 export function parseXLSXToRows(data) {
   const wb = XLSX.read(data, { type: typeof data === 'string' ? 'binary' : 'array' })
-  const firstSheetName = wb.SheetNames[0]
-  if (!firstSheetName) return []
-  const sheet = wb.Sheets[firstSheetName]
-  return XLSX.utils.sheet_to_json(sheet)
+  const allRows = []
+
+  for (const sheetName of wb.SheetNames) {
+    const cleanSheetName = sheetName.trim()
+    // Skip sheets that are metadata or non-routine info
+    if (/^(program folders|instructions|readme|legend|notes)$/i.test(cleanSheetName)) {
+      continue
+    }
+
+    const sheet = wb.Sheets[sheetName]
+    if (!sheet) continue
+
+    const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+    if (!Array.isArray(rawData) || rawData.length === 0) continue
+
+    // Detect header row index (first row containing at least 2 column keywords)
+    let headerRowIdx = 0
+    const headerKeywords = ['exercise', 'routine', 'workout', 'day', 'set', 'rep', 'weight', 'rest', 'lift', 'movement', 'name']
+    for (let i = 0; i < Math.min(rawData.length, 10); i++) {
+      const row = rawData[i]
+      if (!Array.isArray(row)) continue
+      const matchCount = row.filter(cell => {
+        const s = String(cell || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+        return s.length > 0 && s.length <= 25 && headerKeywords.some(kw => s === kw || s.startsWith(kw) || s.endsWith(kw))
+      }).length
+      if (matchCount >= 2) {
+        headerRowIdx = i
+        break
+      }
+    }
+
+    const headers = (rawData[headerRowIdx] || []).map(h => String(h || '').trim())
+    const dataRows = rawData.slice(headerRowIdx + 1)
+
+    dataRows.forEach(rowCells => {
+      if (!Array.isArray(rowCells) || rowCells.every(c => c === '' || c == null)) return
+      const rowObj = {}
+      headers.forEach((h, colIdx) => {
+        if (h) rowObj[h] = rowCells[colIdx] != null ? rowCells[colIdx] : ''
+      })
+
+      // If the row doesn't have an explicit Routine / Day column, default to the Sheet name!
+      const hasRoutine = getRowValue(rowObj, 'Routine', 'Routine Name', 'Workout', 'Workout Name', 'Session', 'Day')
+      if (!hasRoutine && cleanSheetName !== 'Sheet1' && cleanSheetName !== 'Routines & Exercises') {
+        rowObj['Routine'] = cleanSheetName
+      }
+      allRows.push(rowObj)
+    })
+  }
+
+  if (allRows.length === 0 && wb.SheetNames.length > 0) {
+    const firstSheet = wb.Sheets[wb.SheetNames[0]]
+    if (firstSheet) {
+      return XLSX.utils.sheet_to_json(firstSheet, { defval: '' })
+    }
+  }
+
+  return allRows
 }
 
 /**
- * Validates and converts tabular rows (from CSV or XLSX) into structured folders and routines.
+ * Validates and converts tabular rows (from CSV or XLSX) into structured folders, routines,
+ * and custom exercises with maximum fault tolerance.
  */
-export function parseTabularToPlan(rows, defaultUnit = 'kg') {
+export function parseTabularToPlan(rows, defaultUnit = 'kg', customEx = []) {
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new Error('No data found in file')
   }
 
   const folderMap = new Map()
   const routineMap = new Map()
+  const createdCustoms = []
+  const knownCustoms = [...(customEx || [])]
   const errors = []
-  let rowNum = 1
 
   rows.forEach(row => {
-    rowNum++
-    const routineName = (row['Routine'] || row['routine'] || '').trim()
-    if (!routineName) return
+    const exName = getRowValue(row, 'Exercise Name', 'Exercise', 'Movement', 'Lift', 'Name', 'Exercise Title')
+    const exId = getRowValue(row, 'Exercise ID', 'id', 'ID', 'Code')
+    if (!exName && !exId) return
 
-    const folderName = (row['Folder'] || row['folder'] || 'Imported Program').trim()
-    const exId = (row['Exercise ID'] || row['exercise id'] || row['id'] || '').trim()
-    const exName = (row['Exercise Name'] || row['exercise name'] || row['Exercise'] || '').trim()
-    const sets = Math.max(1, parseInt(row['Sets'] || row['sets'] || '3', 10) || 3)
-    const reps = Math.max(1, parseInt(row['Reps'] || row['reps'] || '10', 10) || 10)
-    const weight = Math.max(0, parseFloat(row['Weight'] || row['weight'] || '0') || 0)
-    const unit = normUnit(row['Unit'] || row['unit'] || defaultUnit)
-    const restSec = Math.max(0, parseInt(row['Rest (s)'] || row['rest'] || '90', 10) || 90)
+    let routineName = getRowValue(row, 'Routine', 'Routine Name', 'Workout', 'Workout Name', 'Session', 'Day', 'Split')
+    if (!routineName) {
+      routineName = 'Workout 1'
+    }
 
-    // Resolve exercise ID
+    const folderName = getRowValue(row, 'Folder', 'Folder Name', 'Program', 'Program Name', 'Category') || 'Imported Program'
+    const setsRaw = getRowValue(row, 'Sets', 'Set', 'Total Sets')
+    const repsRaw = getRowValue(row, 'Reps', 'Rep', 'Repetitions', 'Target Reps')
+    const weightRaw = getRowValue(row, 'Weight', 'Load', 'Weight kg', 'Weight lbs', 'Weight lb', 'Target Weight')
+    const unitRaw = getRowValue(row, 'Unit', 'Units', 'Weight Unit')
+    const restRaw = getRowValue(row, 'Rest s', 'Rest', 'Rest sec', 'Rest Time', 'Rest seconds')
+
+    const sets = Math.max(1, parseInt(setsRaw || '3', 10) || 3)
+    const reps = Math.max(1, parseInt(repsRaw || '10', 10) || 10)
+    const weight = Math.max(0, parseFloat(weightRaw || '0') || 0)
+
+    let unit = defaultUnit
+    if (unitRaw) {
+      unit = normUnit(unitRaw)
+    } else if (/lbs?/i.test(weightRaw)) {
+      unit = 'lb'
+    } else if (/kg/i.test(weightRaw)) {
+      unit = 'kg'
+    }
+
+    const restSec = Math.max(0, parseInt(restRaw || '90', 10) || 90)
+
+    // Resolve exercise
     let resolvedId = exId
     if (!resolvedId && exName) {
-      const match = findExerciseByName(exName)
+      const match = findExerciseByName(exName, knownCustoms)
       if (match) resolvedId = match.id
     }
 
-    if (!resolvedId || !EXIDX[resolvedId]) {
-      // If cannot resolve, skip with warning
-      errors.push(`Row ${rowNum}: Exercise "${exName || exId}" not recognized in library`)
-      return
+    if (!resolvedId || (!EXIDX[resolvedId] && !knownCustoms.some(c => c.id === resolvedId))) {
+      // Graceful fallback: register as custom exercise so it is NEVER lost
+      const displayName = exName || exId || 'Custom Exercise'
+      const customId = 'c_' + uid()
+      const newCustom = {
+        id: customId,
+        n: displayName,
+        name: displayName,
+        custom: true,
+        eq: 'custom',
+        tg: '',
+        desc: ''
+      }
+      knownCustoms.push(newCustom)
+      createdCustoms.push(newCustom)
+      resolvedId = customId
     }
 
     // Register folder
@@ -303,12 +523,13 @@ export function parseTabularToPlan(rows, defaultUnit = 'kg') {
   const routines = Array.from(routineMap.values())
 
   if (routines.length === 0) {
-    throw new Error('No valid routines or recognized exercises found in file')
+    throw new Error('No workout routines or exercises could be parsed from the file')
   }
 
   return {
     folders,
     routines,
+    customExercises: createdCustoms,
     errors,
     routineCount: routines.length,
     exerciseCount: routines.reduce((n, r) => n + r.ex.length, 0)
@@ -324,6 +545,18 @@ export function mergeImportedProgram(s, imported, { duplicateStrategy = 'copy', 
   s.folders = safeS.folders
   s.activeFolderId = safeS.activeFolderId
   s.routines = s.routines || []
+  s.customEx = s.customEx || []
+
+  // Integrate any imported custom exercises into user state
+  if (Array.isArray(imported.customExercises) && imported.customExercises.length > 0) {
+    imported.customExercises.forEach(cx => {
+      if (!cx || !cx.id) return
+      const exists = s.customEx.find(c => c.id === cx.id || (c.n || '').toLowerCase() === (cx.n || '').toLowerCase())
+      if (!exists) {
+        s.customEx.push(cx)
+      }
+    })
+  }
 
   const existingRoutineByName = new Map(s.routines.map(r => [r.name.toLowerCase().trim(), r]))
   const existingFolderByName = new Map(s.folders.map(f => [f.name.toLowerCase().trim(), f]))
@@ -348,32 +581,33 @@ export function mergeImportedProgram(s, imported, { duplicateStrategy = 'copy', 
         oldToNewRoutineId.set(impR.id, existing.id)
         return
       }
-      // 'copy' strategy:
-      const copyId = uid()
-      const copyRoutine = {
-        ...impR,
-        id: copyId,
+      // 'copy' strategy: clone with unique name
+      const newId = uid()
+      const newRoutine = {
+        id: newId,
         name: `${impR.name} (Imported)`,
+        emoji: impR.emoji || null,
         ex: (impR.ex || []).map(cleanRoutineExercise),
         _ts: Date.now()
       }
-      s.routines.push(copyRoutine)
-      oldToNewRoutineId.set(impR.id, copyId)
+      s.routines.push(newRoutine)
+      oldToNewRoutineId.set(impR.id, newId)
       return
     }
 
     // New routine
-    const newRoutine = {
-      ...impR,
-      id: impR.id || uid(),
+    const newId = uid()
+    s.routines.push({
+      id: newId,
+      name: impR.name,
+      emoji: impR.emoji || null,
       ex: (impR.ex || []).map(cleanRoutineExercise),
       _ts: Date.now()
-    }
-    s.routines.push(newRoutine)
-    oldToNewRoutineId.set(impR.id, newRoutine.id)
+    })
+    oldToNewRoutineId.set(impR.id, newId)
   })
 
-  // Merge folders
+  // Folders integration
   if (importedFolders.length > 0) {
     importedFolders.forEach(impF => {
       const mappedRoutineIds = (impF.routineIds || [])
@@ -384,47 +618,46 @@ export function mergeImportedProgram(s, imported, { duplicateStrategy = 'copy', 
       const existingF = existingFolderByName.get(fKey)
 
       if (existingF) {
-        mappedRoutineIds.forEach(rId => {
-          if (!existingF.routineIds.includes(rId)) {
-            existingF.routineIds.push(rId)
-          }
-        })
-        existingF._ts = Date.now()
+        if (duplicateStrategy === 'replace') {
+          existingF.routineIds = mappedRoutineIds
+          existingF._ts = Date.now()
+        } else if (duplicateStrategy === 'copy') {
+          const newFId = 'f_' + uid()
+          s.folders.push({
+            id: newFId,
+            name: `${impF.name} (Imported)`,
+            routineIds: mappedRoutineIds,
+            collapsed: false,
+            _ts: Date.now()
+          })
+        } else {
+          // skip: merge new routines into existing folder
+          mappedRoutineIds.forEach(rId => {
+            if (!existingF.routineIds.includes(rId)) existingF.routineIds.push(rId)
+          })
+        }
       } else {
-        const newFolder = {
-          id: 'f_' + uid(),
+        const newFId = 'f_' + uid()
+        s.folders.push({
+          id: newFId,
           name: impF.name,
           routineIds: mappedRoutineIds,
           collapsed: false,
           _ts: Date.now()
-        }
-        s.folders.push(newFolder)
+        })
       }
     })
-  } else {
-    // If no folders in imported file, add imported routines to the active folder
-    const targetFolder = s.folders.find(f => f.id === s.activeFolderId) || s.folders[0]
-    if (targetFolder) {
-      oldToNewRoutineId.forEach(newId => {
-        if (!targetFolder.routineIds.includes(newId)) {
-          targetFolder.routineIds.push(newId)
-        }
-      })
-    }
   }
 
-  // Handle schedule if requested
+  // Schedule days merge if requested
   if (schedule && imported.week && typeof imported.week === 'object') {
+    s.week = s.week || {}
     Object.entries(imported.week).forEach(([day, rIds]) => {
-      const mapped = [].concat(rIds)
-        .map(id => oldToNewRoutineId.get(id) || id)
-        .filter(id => s.routines.some(r => r.id === id))
-      if (mapped.length > 0) {
-        s.week[day] = mapped
-      }
+      const arr = Array.isArray(rIds) ? rIds : [rIds]
+      s.week[day] = arr.map(id => oldToNewRoutineId.get(id)).filter(Boolean)
     })
   }
 
-  ensureFolders(s)
+  s._ts = Date.now()
   return s
 }

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import * as XLSX from 'xlsx'
 import {
   buildProgramExport,
   planToTabularRows,
@@ -7,7 +8,9 @@ import {
   parseCSVToRows,
   parseXLSXToRows,
   parseTabularToPlan,
-  mergeImportedProgram
+  mergeImportedProgram,
+  findExerciseByName,
+  getRowValue
 } from './plan-import-export.js'
 import { ensureFolders } from './folders.js'
 
@@ -102,6 +105,91 @@ describe('plan-import-export module', () => {
     expect(plan.folders[0].name).toBe('PPL Program')
     expect(plan.routines[0].ex.length).toBe(2)
     expect(plan.routines[0].ex[1].unit).toBe('lb')
+  })
+
+  it('resolves real-world natural exercise names from Google Sheets / Excel', () => {
+    const bench = findExerciseByName('Bench Press')
+    expect(bench).toBeTruthy()
+    expect(bench.id).toBe('0025')
+
+    const squat = findExerciseByName('Barbell Squat')
+    expect(squat).toBeTruthy()
+    expect(squat.id).toBe('0043')
+
+    const deadlift = findExerciseByName('Deadlift')
+    expect(deadlift).toBeTruthy()
+    expect(deadlift.id).toBe('0032')
+
+    const bicepCurl = findExerciseByName('Bicep Curl')
+    expect(bicepCurl).toBeTruthy()
+    expect(bicepCurl.id).toBe('0294')
+  })
+
+  it('parses realistic Excel workbook with Day/Exercise columns and title row', () => {
+    const wb = XLSX.utils.book_new()
+    const rawData = [
+      ['MY 3-DAY WORKOUT SPLIT', '', '', '', ''],
+      ['Day', 'Exercise', 'Sets', 'Reps', 'Weight'],
+      ['Chest & Triceps', 'Bench Press', 4, 10, 80],
+      ['Chest & Triceps', 'Incline Dumbbell Press', 3, 12, 30],
+      ['Back & Biceps', 'Lat Pulldown', 4, 10, 65],
+      ['Legs', 'Squat', 5, 5, 100]
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(rawData)
+    XLSX.utils.book_append_sheet(wb, ws, 'Workouts')
+    const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+
+    const parsedRows = parseXLSXToRows(new Uint8Array(buffer))
+    expect(parsedRows.length).toBe(4)
+
+    const plan = parseTabularToPlan(parsedRows, 'kg')
+    expect(plan.routines.length).toBe(3)
+    const chest = plan.routines.find(r => r.name === 'Chest & Triceps')
+    expect(chest).toBeTruthy()
+    expect(chest.ex.length).toBe(2)
+    expect(chest.ex[0].id).toBe('0025') // Bench Press
+    expect(chest.ex[0].weight).toBe(80)
+  })
+
+  it('parses multi-sheet Excel workbook where sheets represent routines', () => {
+    const wb = XLSX.utils.book_new()
+    const pushData = [
+      ['Exercise', 'Sets', 'Reps', 'Weight (kg)', 'Rest'],
+      ['Bench Press', 4, 8, 85, 120],
+      ['Overhead Press', 3, 10, 50, 90]
+    ]
+    const pullData = [
+      ['Exercise', 'Sets', 'Reps', 'Weight (kg)', 'Rest'],
+      ['Deadlift', 3, 5, 140, 180],
+      ['Lat Pulldown', 4, 12, 60, 90]
+    ]
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pushData), 'Push Routine')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pullData), 'Pull Routine')
+    const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+
+    const parsedRows = parseXLSXToRows(new Uint8Array(buffer))
+    expect(parsedRows.length).toBe(4)
+
+    const plan = parseTabularToPlan(parsedRows, 'kg')
+    expect(plan.routines.length).toBe(2)
+    expect(plan.routines.some(r => r.name === 'Push Routine')).toBe(true)
+    expect(plan.routines.some(r => r.name === 'Pull Routine')).toBe(true)
+  })
+
+  it('gracefully registers un-catalogued exercises as custom exercises without failing', () => {
+    const rawData = [
+      { 'Workout': 'Leg Day', 'Exercise': 'Rare Brand Belt Squat 9000', 'Sets': 4, 'Reps': 12, 'Weight': 120 }
+    ]
+    const plan = parseTabularToPlan(rawData, 'kg')
+    expect(plan.routines.length).toBe(1)
+    expect(plan.customExercises.length).toBe(1)
+    expect(plan.customExercises[0].n).toBe('Rare Brand Belt Squat 9000')
+
+    const state = { routines: [], customEx: [] }
+    mergeImportedProgram(state, plan)
+    expect(state.customEx.length).toBe(1)
+    expect(state.customEx[0].n).toBe('Rare Brand Belt Squat 9000')
+    expect(state.routines[0].ex[0].id).toBe(state.customEx[0].id)
   })
 
   it('merges imported program with duplicate resolution: copy', () => {

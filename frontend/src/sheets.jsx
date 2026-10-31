@@ -33,7 +33,7 @@ import { exerciseMuscleSnapshot, loadOfWorkouts, MUSCLES, MUSCLE_NAME, muscleWei
 import { parseImport, mergeImport } from './lib/import-csv.js'
 import { importHevyData, HevyApiError, HEVY_DEV_SETTINGS, mergeHevyRoutines } from './lib/import-hevy.js'
 import { buildPlanBundle, parsePlan, mergePlan, printPlan, planPrintHTML } from './lib/plan-share.js'
-import { buildProgramExport, exportPlanToCSV, exportPlanToXLSX, parseCSVToRows, parseXLSXToRows, parseTabularToPlan, mergeImportedProgram } from './lib/plan-import-export.js'
+import { buildProgramExport, exportPlanToCSV, exportPlanToXLSX, parseCSVToRows, parseXLSXToRows, parseTabularToPlan, mergeImportedProgram, getSamplePlanTemplate } from './lib/plan-import-export.js'
 import { estimate1RM, best1RM, is1RMRecord, REP_CAP, formulaOf, FORMULA_NAMES } from './lib/onerm.js'
 import { exerciseHistory } from './lib/exercise-history.js'
 import { isBellEx, dbLoadOf, dbLoadFor, withDbLoad, withMeaning, historyAs, entryDbLoad, currentDbLoad, isOneArm, ownedWeightsFor, dumbbellsOf, ownsDumbbells, withDumbbells, presetWeights, cleanWeights } from './lib/dumbbells.js'
@@ -2128,23 +2128,24 @@ export const planToolsSheet = () => ui().openSheet(close => <PlanTools close={cl
 
 // The three things the Plan menu and this sheet both do with a plan, so the two can never drift.
 export const planHasRoutines = st => (st.routines || []).some(r => r.ex && r.ex.length)
-export async function exportPlanFile(format = 'json') {
-  const st = S(), user = useStore.getState().user
-  const planName = user?.name ? t('{0}’s plan', user.name) : 'APEX Fitness Plan'
+export async function exportPlanFile(format = 'json', template = false) {
+  const st = template ? getSamplePlanTemplate() : S()
+  const user = useStore.getState().user
+  const planName = template ? 'APEX Sample Workout Plan' : (user?.name ? t('{0}’s plan', user.name) : 'APEX Fitness Plan')
 
   if (format === 'csv') {
     const csv = exportPlanToCSV(st, planName)
-    const name = 'apex-plan-' + todayISO() + '.csv'
+    const name = (template ? 'apex-template-' : 'apex-plan-') + todayISO() + '.csv'
     if (MOBILE) { try { await shareExport(csv, name) } catch (e) { /* dismissed */ } return }
     const blob = new Blob([csv], { type: 'text/csv' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href)
-    toast(t('CSV plan exported.'))
+    toast(template ? t('Sample CSV template downloaded.') : t('CSV plan exported.'))
     return
   }
 
   if (format === 'xlsx') {
     const xlsxBuf = exportPlanToXLSX(st, planName)
-    const name = 'apex-plan-' + todayISO() + '.xlsx'
+    const name = (template ? 'apex-template-' : 'apex-plan-') + todayISO() + '.xlsx'
     if (MOBILE) {
       try {
         const blob = new Blob([xlsxBuf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -2154,17 +2155,17 @@ export async function exportPlanFile(format = 'json') {
     }
     const blob = new Blob([xlsxBuf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href)
-    toast(t('Excel workbook exported.'))
+    toast(template ? t('Sample Excel template downloaded.') : t('Excel workbook exported.'))
     return
   }
 
   const bundle = buildProgramExport(st, planName)
   const json = JSON.stringify(bundle, null, 2)
-  const name = 'apex-plan-' + todayISO() + '.json'
+  const name = (template ? 'apex-template-' : 'apex-plan-') + todayISO() + '.json'
   if (MOBILE) { try { await shareExport(json, name) } catch (e) { /* dismissed */ } return }
   const blob = new Blob([json], { type: 'application/json' })
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href)
-  toast(t('Plan file saved. Send it to a friend!'))
+  toast(template ? t('Sample JSON template downloaded.') : t('Plan file saved. Send it to a friend!'))
 }
 // Web: the browser's print dialog (→ Save as PDF). Mobile: the OS print flow via the native
 // Print plugin — Android WebView has no window.print(). Same printable HTML both ways.
@@ -2178,12 +2179,14 @@ export function importPlanFile(f, onRead) {
   if (!f) return
   const ext = (f.name || '').split('.').pop().toLowerCase()
 
+  const st = S()
+
   if (ext === 'xlsx' || ext === 'xls') {
     const rd = new FileReader()
     rd.onload = () => {
       try {
         const rows = parseXLSXToRows(rd.result)
-        const plan = parseTabularToPlan(rows, S().unit || 'kg')
+        const plan = parseTabularToPlan(rows, st.unit || 'kg', st.customEx || [])
         onRead?.()
         planImportSheet(plan)
       } catch (e) {
@@ -2199,7 +2202,7 @@ export function importPlanFile(f, onRead) {
     rd.onload = () => {
       try {
         const rows = parseCSVToRows(rd.result)
-        const plan = parseTabularToPlan(rows, S().unit || 'kg')
+        const plan = parseTabularToPlan(rows, st.unit || 'kg', st.customEx || [])
         onRead?.()
         planImportSheet(plan)
       } catch (e) {
@@ -2214,7 +2217,7 @@ export function importPlanFile(f, onRead) {
   rd.onload = () => {
     try {
       const parsed = JSON.parse(rd.result)
-      const bundle = parsed.apex_program_version ? parsed : parsePlan(parsed, S().unit || 'kg')
+      const bundle = parsed.apex_program_version ? parsed : parsePlan(parsed, st.unit || 'kg')
       onRead?.()
       planImportSheet(bundle)
     } catch (e) {
@@ -2249,6 +2252,8 @@ function PlanTools({ close }) {
     {!hasRoutines && <div className="dim small" style={{ margin: '12px 2px 0' }}>{t('Add an exercise to a routine first. An empty plan has nothing to share.')}</div>}
     <h4 className="sec">{t('Got a plan from a friend?')}</h4>
     <Button variant="ghost" icon="download" onClick={() => fileRef.current?.click()}>{t('Import plan (JSON, Excel, CSV)')}</Button>
+    <div style={{ height: 6 }} />
+    <Button variant="ghost" className="dim" icon="download" onClick={async () => { await exportPlanFile('xlsx', true); close() }}>{t('Download sample Excel template (.xlsx)')}</Button>
     <input ref={fileRef} type="file" accept=".json,.csv,.xlsx,.xls,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={pickFile} hidden />
   </>
 }
