@@ -37,10 +37,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -189,7 +189,7 @@ jobs:
 
       - name: Upload APEX-Fitness.ipa
         if: steps.signing_setup.outputs.valid == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: APEX-Fitness.ipa
           path: build/artifact/APEX-Fitness.ipa
@@ -214,7 +214,7 @@ jobs:
 
       - name: Upload Verified Archive (APEX-Fitness.xcarchive)
         if: steps.signing_setup.outputs.valid != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: APEX-Fitness.xcarchive
           path: build/APEX-Fitness.xcarchive
