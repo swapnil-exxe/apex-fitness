@@ -215,15 +215,18 @@ async function initDatabaseFromPostgres() {
       db.federatedIdentities = await dbService.getAllFederatedIdentities();
       console.log(`[PostgreSQL] Hydrated ${db.users.length} user(s), ${db.creds.length} passkey(s), ${db.federatedIdentities.length} federated identities from database.`);
 
-      // Hydrate state files if missing on local disk
+      // Hydrate state files from PostgreSQL (source of truth)
       for (const u of db.users) {
         const file = stateFile(u.id);
-        if (!fs.existsSync(file)) {
-          const state = await dbService.getUserState(u.id);
-          if (state) {
-            atomicWrite(file, JSON.stringify(state));
-            console.log(`[PostgreSQL] Hydrated state for ${u.name} (${u.id})`);
-          }
+        let diskRev = -1;
+        if (fs.existsSync(file)) {
+          try { diskRev = JSON.parse(fs.readFileSync(file, 'utf8'))._rev || 0; } catch {}
+        }
+        const state = await dbService.getUserState(u.id);
+        if (state && (diskRev === -1 || (state._rev || 0) >= diskRev)) {
+          atomicWrite(file, JSON.stringify(state));
+          stateCache.delete(u.id);
+          console.log(`[PostgreSQL] Hydrated state for ${u.name} (${u.id}) at rev ${state._rev}`);
         }
       }
     } else if (db.users.length > 0) {
@@ -272,26 +275,34 @@ function readState(uid) {
 // replace, losing what a restore could still bring back.
 const UNREADABLE = Symbol('unreadable');
 async function readStateStrict(uid) {
-  let raw;
-  try { raw = fs.readFileSync(stateFile(uid), 'utf8'); }
-  catch (e) {
-    if (e.code === 'ENOENT') {
-      if (process.env.DATABASE_URL) {
-        try {
-          const pgState = await dbService.getUserState(uid);
-          if (pgState) {
-            try { atomicWrite(stateFile(uid), JSON.stringify(pgState)); } catch {}
-            return pgState;
-          }
-        } catch (dbErr) {
-          console.warn('[PostgreSQL] getUserState fallback error:', dbErr.message);
+  let diskState = null;
+  let diskError = false;
+  try {
+    const raw = fs.readFileSync(stateFile(uid), 'utf8');
+    diskState = JSON.parse(raw);
+  } catch (e) {
+    if (e && e.code !== 'ENOENT') diskError = true;
+  }
+
+  if (process.env.DATABASE_URL) {
+    try {
+      const pgState = await dbService.getUserState(uid);
+      if (pgState) {
+        const pgRev = pgState._rev || 0;
+        const diskRev = diskState?._rev || 0;
+        if (!diskState || pgRev >= diskRev) {
+          try { atomicWrite(stateFile(uid), JSON.stringify(pgState)); } catch {}
+          stateCache.delete(uid);
+          return pgState;
         }
       }
-      return null;
+    } catch (dbErr) {
+      console.warn('[PostgreSQL] getUserState fallback error:', dbErr.message);
     }
-    return UNREADABLE;
   }
-  try { return JSON.parse(raw); } catch { return UNREADABLE; }
+
+  if (diskError && !diskState) return UNREADABLE;
+  return diskState;
 }
 // A stored document as a client gets it: without the server's own notes `_unstamped` and `_prior`.
 function forClient(S) {
@@ -2820,16 +2831,25 @@ const routes = {
   'GET /api/data/rev': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    let doc = readStateCached(user.id);
-    if (!doc && process.env.DATABASE_URL) {
+    let doc = null;
+    if (process.env.DATABASE_URL) {
       try {
         const pgState = await dbService.getUserState(user.id);
         if (pgState) {
-          try { atomicWrite(stateFile(user.id), JSON.stringify(pgState)); } catch {}
-          doc = pgState;
+          const diskDoc = readStateCached(user.id);
+          if (!diskDoc || (pgState._rev || 0) >= (diskDoc._rev || 0)) {
+            try { atomicWrite(stateFile(user.id), JSON.stringify(pgState)); } catch {}
+            stateCache.set(user.id, { mtimeMs: Date.now(), size: JSON.stringify(pgState).length, hitAt: Date.now(), S: pgState });
+            doc = pgState;
+          } else {
+            doc = diskDoc;
+          }
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[PostgreSQL] /api/data/rev error:', e.message);
+      }
     }
+    if (!doc) doc = readStateCached(user.id);
     json(res, 200, { rev: doc?._rev || 0, ...(doc?._wid ? { wid: doc._wid } : {}) });
   },
 
